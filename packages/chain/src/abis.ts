@@ -29,7 +29,7 @@ export const SWAP_TRACKED_EVENT = {
   ],
 } as const;
 
-/** Lock: `locks(uint256)` (getter auto OMITE o struct aninhado `key`) + `nextLockId`. */
+/** Lock: `locks(uint256)` (o getter INCLUI a PoolKey `key` como 1º campo) + `nextLockId`. */
 export const LOCK_ABI = [
   {
     type: 'function',
@@ -37,6 +37,17 @@ export const LOCK_ABI = [
     stateMutability: 'view',
     inputs: [{ name: '', type: 'uint256' }],
     outputs: [
+      {
+        name: 'key',
+        type: 'tuple',
+        components: [
+          { name: 'currency0', type: 'address' },
+          { name: 'currency1', type: 'address' },
+          { name: 'fee', type: 'uint24' },
+          { name: 'tickSpacing', type: 'int24' },
+          { name: 'hooks', type: 'address' },
+        ],
+      },
       { name: 'projectOwner', type: 'address' },
       { name: 'principalLiquidity', type: 'uint128' },
       { name: 'tickLower', type: 'int24' },

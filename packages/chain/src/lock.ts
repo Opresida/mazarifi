@@ -22,16 +22,17 @@ export async function getLockPosition(lockId: bigint): Promise<LockPosition> {
     abi: LOCK_ABI,
     functionName: 'locks',
     args: [lockId],
-  })) as readonly [Address, bigint, number, number, number, number, bigint, Address, boolean];
+  })) as readonly [unknown, Address, bigint, number, number, number, number, bigint, Address, boolean];
+  // r[0] = PoolKey (key), ignorado aqui; posição começa em r[1].
   return {
-    projectOwner: r[0],
-    principalLiquidity: r[1],
-    tickLower: r[2],
-    tickUpper: r[3],
-    minTick: r[4],
-    maxTick: r[5],
-    unlockTime: r[6],
-    keeper: r[7],
-    active: r[8],
+    projectOwner: r[1],
+    principalLiquidity: r[2],
+    tickLower: r[3],
+    tickUpper: r[4],
+    minTick: r[5],
+    maxTick: r[6],
+    unlockTime: r[7],
+    keeper: r[8],
+    active: r[9],
   };
 }

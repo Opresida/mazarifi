@@ -54,7 +54,8 @@ export async function getPoolPrice(token: Address, hook?: Address): Promise<numb
     })) as readonly [bigint, number, number, number];
     if (res[0] === 0n) return null;
     return priceFromSqrtX96(res[0]);
-  } catch {
+  } catch (e) {
+    if (process.env.MAZARI_DEBUG) console.error('getPoolPrice err:', (e as Error).message);
     return null;
   }
 }
