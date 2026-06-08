@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ilFullRange, concentratedAmplification, ilConcentrated, ilToUsd } from './il';
-import { feeAprGross, apyNet } from './apy';
+import { feeAprGross, aprNet, aprToApy } from './apy';
 import { honestScoreboard } from './scoreboard';
 import { riskScore, riskBand, type RiskInput } from './risk';
 import { migrationAdvice } from './migration';
@@ -41,8 +41,18 @@ describe('APY (fee-APR honesto)', () => {
     const half = feeAprGross({ volume24hUsd: 1_000_000, feeTier: 0.003, activeTvlUsd: 1_000_000, fractionInRange: 0.5 });
     expect(half).toBeCloseTo(full / 2, 9);
   });
-  it('APY líquido na Fase 1 (fees=0) = bruto', () => {
-    expect(apyNet(1.095)).toBeCloseTo(1.095, 9);
+  it('APR líquido na Fase 1 (fees=0) = bruto', () => {
+    expect(aprNet(1.095)).toBeCloseTo(1.095, 9);
+  });
+  it('APR líquido com fees é MULTIPLICATIVO (Doc 1 §2)', () => {
+    expect(aprNet(0.1, 1000, 1000)).toBeCloseTo(0.081, 9); // 0,10 × 0,9 × 0,9
+  });
+  it('APR→APY: sem compor (n=1) APY = APR', () => {
+    expect(aprToApy(0.1, 1)).toBeCloseTo(0.1, 9);
+  });
+  it('APR→APY: compondo diário (n=365) APY > APR', () => {
+    expect(aprToApy(0.1, 365)).toBeCloseTo(0.10516, 5);
+    expect(aprToApy(0.1, 365)).toBeGreaterThan(0.1);
   });
 });
 

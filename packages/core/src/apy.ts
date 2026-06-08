@@ -1,7 +1,10 @@
 /**
- * APY de pool — fee-APR HONESTO. Nunca publicamos número de terceiro como nosso:
- * recalculamos o fee-APR a partir de volume/fee/TVL reais (ground-truth on-chain
- * quando é pool Nortoken via SwapTracked; subgraph/RPC quando é externa).
+ * Rendimento de pool — fee-APR HONESTO. Nunca publicamos número de terceiro como nosso:
+ * recalculamos a partir de volume/fee/TVL reais (ground-truth on-chain via SwapTracked
+ * nas pools Nortoken; subgraph/RPC nas externas).
+ *
+ * APR vs APY: APR = taxa anual SIMPLES (sem reinvestir); APY = COM juros compostos
+ * (reinvestindo). APY ≥ APR sempre. Exibimos os DOIS, lado a lado e rotulados.
  */
 
 export interface FeeAprInput {
@@ -26,9 +29,22 @@ export function feeAprGross(i: FeeAprInput): number {
 }
 
 /**
- * APY LÍQUIDO = bruto − fee da parceira − fee da Mazari (em bps). Na Fase 1 ambos = 0
- * (não movemos dinheiro), mas os campos já existem para a Fase 3 (agregador).
+ * APR LÍQUIDO (Doc 1 §2) = bruto × (1 − fee_parceira) × (1 − fee_Mazari), onde as fees são
+ * % DO RENDIMENTO (performance fee), em bps. MULTIPLICATIVO (não subtrai do APR). Na Fase 1
+ * ambos = 0 (não movemos dinheiro) → líquido = bruto; campos prontos pra Fase 3 (agregador).
+ * Golden: aprNet(0.10, 1000, 1000) = 0,10 × 0,9 × 0,9 = 0,081.
  */
-export function apyNet(grossApr: number, partnerFeeBps = 0, mazariFeeBps = 0): number {
-  return grossApr - (partnerFeeBps + mazariFeeBps) / 10_000;
+export function aprNet(grossApr: number, partnerFeeBps = 0, mazariFeeBps = 0): number {
+  return grossApr * (1 - partnerFeeBps / 10_000) * (1 - mazariFeeBps / 10_000);
+}
+
+/**
+ * Converte APR → APY assumindo `periodsPerYear` reinvestimentos (default 365 = diário):
+ *   APY = (1 + APR/n)^n − 1.
+ * É APY ≥ APR. SEMPRE rotular a frequência ao exibir (nunca trocar um pelo outro escondido).
+ * Golden: aprToApy(0.10, 1) = 0,10 ; aprToApy(0.10, 365) ≈ 0,10516.
+ */
+export function aprToApy(apr: number, periodsPerYear = 365): number {
+  if (periodsPerYear <= 0) return apr;
+  return Math.pow(1 + apr / periodsPerYear, periodsPerYear) - 1;
 }

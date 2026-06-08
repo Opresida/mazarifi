@@ -38,6 +38,7 @@ async function main() {
       feeTier: p.feeTier,
       riskScore: p.riskScore,
       feeAprHonest: p.feeAprHonest,
+      feeApyHonest: p.feeApyHonest,
       netUsd: p.netUsd,
       raw: p.raw as object,
       updatedAt: new Date(),
@@ -54,6 +55,7 @@ async function main() {
           volumeUsd24h: row.volumeUsd24h,
           riskScore: row.riskScore,
           feeAprHonest: row.feeAprHonest,
+          feeApyHonest: row.feeApyHonest,
           netUsd: row.netUsd,
           raw: row.raw,
           updatedAt: row.updatedAt,
@@ -66,18 +68,19 @@ async function main() {
   const apyOf = (p: EnrichedPool) => p.feeAprHonest ?? p.apyBase ?? 0;
   const ranked = [...all].sort((a, b) => b.riskScore - a.riskScore || apyOf(b) - apyOf(a));
 
-  console.log('=== TOP 15 (risco + APY líquido · cego à origem) ===');
+  console.log('=== TOP 15 (risco + rendimento · cego à origem) ===');
+  console.log('APR = simples · APY = composto diário · (recalc) = nós calculamos / (defillama) = reportado\n');
   for (const p of ranked.slice(0, 15)) {
-    const apy =
+    const yield_ =
       p.feeAprHonest != null
-        ? `${p.feeAprHonest.toFixed(1)}% (recalc)`
+        ? `APR ${p.feeAprHonest.toFixed(1)}% / APY ${(p.feeApyHonest ?? 0).toFixed(1)}% (recalc)`
         : p.apyBase != null
-          ? `${p.apyBase.toFixed(1)}% (defillama)`
+          ? `APY ${p.apyBase.toFixed(1)}% (defillama)`
           : '—';
-    const sym = p.symbol.slice(0, 20).padEnd(20);
-    const proj = p.project.slice(0, 14).padEnd(14);
+    const sym = p.symbol.slice(0, 18).padEnd(18);
+    const proj = p.project.slice(0, 13).padEnd(13);
     const tvl = `$${Math.round(p.tvlUsd ?? 0).toLocaleString('en-US')}`.padStart(13);
-    console.log(`risco ${String(p.riskScore).padStart(3)} | ${sym} | ${proj} | TVL ${tvl} | APY ${apy.padEnd(18)} | [${p.provenance}]`);
+    console.log(`risco ${String(p.riskScore).padStart(3)} | ${sym} | ${proj} | TVL ${tvl} | ${yield_}`);
   }
   process.exit(0);
 }

@@ -14,7 +14,8 @@ export const pools = pgTable('pools', {
   volumeUsd24h: doublePrecision('volume_usd_24h'),
   feeTier: doublePrecision('fee_tier'),
   riskScore: integer('risk_score'),
-  feeAprHonest: doublePrecision('fee_apr_honest'), // % RECALCULADO (onde há volume)
+  feeAprHonest: doublePrecision('fee_apr_honest'), // % — APR líquido RECALCULADO (onde há volume)
+  feeApyHonest: doublePrecision('fee_apy_honest'), // % — APY (APR composto diário)
   netUsd: doublePrecision('net_usd'), // placar fees − IL (quando houver histórico)
   raw: jsonb('raw'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

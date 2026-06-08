@@ -1,9 +1,10 @@
-import { riskScore, feeAprGross, apyNet, type RiskInput } from '@mazarifi/core';
+import { riskScore, feeAprGross, aprNet, aprToApy, type RiskInput } from '@mazarifi/core';
 import type { NormalizedPool } from './types.js';
 
 export interface EnrichedPool extends NormalizedPool {
   riskScore: number;
-  feeAprHonest: number | null; // % (RECALCULADO on-chain onde há volume)
+  feeAprHonest: number | null; // % — APR líquido RECALCULADO (onde há volume)
+  feeApyHonest: number | null; // % — APY (APR composto diário), rotulado
   netUsd: number | null;
 }
 
@@ -20,16 +21,18 @@ export function enrich(p: NormalizedPool): EnrichedPool {
   };
   const rs = riskScore(risk);
 
-  // fee-APR HONESTO: só recalcula quando temos volume + tier + TVL reais (pools Nortoken).
+  // fee-APR/APY HONESTO: só recalcula quando temos volume + tier + TVL reais (pools Nortoken).
   // Pras externas (sem tier/volume confiável), fica null → o ranking usa apyBase reportado (proveniência).
   let feeAprHonest: number | null = null;
+  let feeApyHonest: number | null = null;
   if (p.volumeUsd24h != null && p.feeTier != null && p.tvlUsd && p.tvlUsd > 0) {
-    const gross = feeAprGross({ volume24hUsd: p.volumeUsd24h, feeTier: p.feeTier, activeTvlUsd: p.tvlUsd });
-    feeAprHonest = apyNet(gross) * 100; // fração → % (mesma convenção do apyBase)
+    const aprFrac = aprNet(feeAprGross({ volume24hUsd: p.volumeUsd24h, feeTier: p.feeTier, activeTvlUsd: p.tvlUsd }));
+    feeAprHonest = aprFrac * 100; // APR líquido → %
+    feeApyHonest = aprToApy(aprFrac, 365) * 100; // APY (composto diário) → %
   }
 
   // placar honesto (fees − IL): precisa de IL realizado (histórico de preço) → v1 deixa null (TODO).
   const netUsd: number | null = null;
 
-  return { ...p, riskScore: rs, feeAprHonest, netUsd };
+  return { ...p, riskScore: rs, feeAprHonest, feeApyHonest, netUsd };
 }
