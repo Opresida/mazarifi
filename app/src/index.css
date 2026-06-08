@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+
+/* ── Mazari Fi — identidade "Ink & Iris" (única; nada de verde-beefy / emerald-Nortoken) ── */
+@theme {
+  --color-ink: #0a0b14;
+  --color-ink-2: #0e0f1c;
+  --color-panel: #14162400;
+  --color-panel-solid: #141624;
+  --color-panel-2: #1a1d30;
+  --color-edge: #262a45;
+  --color-edge-soft: #1e2138;
+  --color-iris: #7c6ff0;
+  --color-iris-bright: #9d90ff;
+  --color-iris-dim: #4a4480;
+  --color-gold: #f5b544;
+  --color-teal: #2dd4bf;
+  --color-rose: #fb7185;
+  --color-ftext: #e7e8f2;
+  --color-muted: #9a9cb8;
+  --color-muted-2: #6c6f8c;
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  background: var(--color-ink);
+  color-scheme: dark;
+}
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ftext);
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgba(124, 111, 240, 0.16), transparent 60%),
+    radial-gradient(700px 400px at 0% 0%, rgba(245, 181, 68, 0.06), transparent 55%),
+    var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+.font-display {
+  font-family: var(--font-display);
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+::selection {
+  background: rgba(124, 111, 240, 0.35);
+}
+/* scrollbar discreta */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a2e4d;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
