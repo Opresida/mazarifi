@@ -14,9 +14,23 @@ export const pools = pgTable('pools', {
   volumeUsd24h: doublePrecision('volume_usd_24h'),
   feeTier: doublePrecision('fee_tier'),
   riskScore: integer('risk_score'),
-  feeAprHonest: doublePrecision('fee_apr_honest'), // % — APR líquido RECALCULADO (onde há volume)
-  feeApyHonest: doublePrecision('fee_apy_honest'), // % — APY (APR composto diário)
-  netUsd: doublePrecision('net_usd'), // placar fees − IL (quando houver histórico)
+  // ── rendimento LÍQUIDO de IL (a cascata honesta) ──
+  feeApr: doublePrecision('fee_apr'), // % fee (componente)
+  rewardApr: doublePrecision('reward_apr'), // % incentivo (TEMPORÁRIO)
+  ilPct: doublePrecision('il_pct'), // % perda impermanente na janela
+  costApr: doublePrecision('cost_apr'), // % custos
+  netWindowPct: doublePrecision('net_window_pct'), // net DA janela (verdade crua)
+  netApr: doublePrecision('net_apr'), // % anualizado líquido
+  netApy: doublePrecision('net_apy'), // % composto líquido (o headline)
+  rangeLow: doublePrecision('range_low'),
+  rangeHigh: doublePrecision('range_high'),
+  windowDays: integer('window_days'),
+  exposure: text('exposure'),
+  ilRisk: text('il_risk'),
+  // legado (referência)
+  feeAprHonest: doublePrecision('fee_apr_honest'),
+  feeApyHonest: doublePrecision('fee_apy_honest'),
+  netUsd: doublePrecision('net_usd'),
   raw: jsonb('raw'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

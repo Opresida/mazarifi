@@ -37,50 +37,43 @@ async function main() {
       volumeUsd24h: p.volumeUsd24h,
       feeTier: p.feeTier,
       riskScore: p.riskScore,
-      feeAprHonest: p.feeAprHonest,
-      feeApyHonest: p.feeApyHonest,
-      netUsd: p.netUsd,
+      feeApr: p.feeApr,
+      rewardApr: p.rewardApr,
+      ilPct: p.ilPctOut,
+      costApr: p.costApr,
+      netWindowPct: p.netWindowPct,
+      netApr: p.netApr,
+      netApy: p.netApy,
+      rangeLow: p.rangeLow,
+      rangeHigh: p.rangeHigh,
+      windowDays: p.windowDays,
+      exposure: p.exposure,
+      ilRisk: p.ilRisk,
       raw: p.raw as object,
       updatedAt: new Date(),
     };
-    await db
-      .insert(pools)
-      .values(row)
-      .onConflictDoUpdate({
-        target: pools.poolKey,
-        set: {
-          tvlUsd: row.tvlUsd,
-          apyBase: row.apyBase,
-          apyReward: row.apyReward,
-          volumeUsd24h: row.volumeUsd24h,
-          riskScore: row.riskScore,
-          feeAprHonest: row.feeAprHonest,
-          feeApyHonest: row.feeApyHonest,
-          netUsd: row.netUsd,
-          raw: row.raw,
-          updatedAt: row.updatedAt,
-        },
-      });
+    const { poolKey: _k, source: _s, provenance: _p, ...upd } = row;
+    await db.insert(pools).values(row).onConflictDoUpdate({ target: pools.poolKey, set: upd });
   }
   console.log(`✅ ${all.length} pools persistidas no Neon.\n`);
 
-  // RANKING honesto — CEGO À ORIGEM: ordena por risco, depois APY. `source` NÃO interfere.
-  const apyOf = (p: EnrichedPool) => p.feeAprHonest ?? p.apyBase ?? 0;
-  const ranked = [...all].sort((a, b) => b.riskScore - a.riskScore || apyOf(b) - apyOf(a));
+  // RANKING honesto — CEGO À ORIGEM: ordena por risco, depois rendimento LÍQUIDO. `source` NÃO interfere.
+  const netOf = (p: EnrichedPool) => p.netApr ?? p.apyBase ?? 0;
+  const ranked = [...all].sort((a, b) => b.riskScore - a.riskScore || netOf(b) - netOf(a));
 
-  console.log('=== TOP 15 (risco + rendimento · cego à origem) ===');
-  console.log('APR = simples · APY = composto diário · (recalc) = nós calculamos / (defillama) = reportado\n');
+  console.log('=== TOP 15 (risco + rendimento LÍQUIDO de IL · cego à origem) ===');
+  console.log('net = fee + incentivo − IL − custos (anualizado da janela) · faixa = 7d↔30d\n');
   for (const p of ranked.slice(0, 15)) {
-    const yield_ =
-      p.feeAprHonest != null
-        ? `APR ${p.feeAprHonest.toFixed(1)}% / APY ${(p.feeApyHonest ?? 0).toFixed(1)}% (recalc)`
+    const net =
+      p.netApr != null
+        ? `net ${p.netApr.toFixed(1)}%${p.ilPctOut ? ` (IL −${p.ilPctOut.toFixed(2)}%/${p.windowDays}d)` : ''}`
         : p.apyBase != null
-          ? `APY ${p.apyBase.toFixed(1)}% (defillama)`
+          ? `APY ${p.apyBase.toFixed(1)}% (reportado)`
           : '—';
-    const sym = p.symbol.slice(0, 18).padEnd(18);
+    const sym = p.symbol.slice(0, 16).padEnd(16);
     const proj = p.project.slice(0, 13).padEnd(13);
     const tvl = `$${Math.round(p.tvlUsd ?? 0).toLocaleString('en-US')}`.padStart(13);
-    console.log(`risco ${String(p.riskScore).padStart(3)} | ${sym} | ${proj} | TVL ${tvl} | ${yield_}`);
+    console.log(`risco ${String(p.riskScore).padStart(3)} | ${sym} | ${proj} | TVL ${tvl} | ${net}`);
   }
   process.exit(0);
 }

@@ -11,9 +11,19 @@ export interface Pool {
   volume_usd_24h: number | null;
   fee_tier: number | null;
   risk_score: number | null;
-  fee_apr_honest: number | null; // % APR recalculado
-  fee_apy_honest: number | null; // % APY (composto diário)
-  net_usd: number | null;
+  // ── rendimento LÍQUIDO de IL (a cascata honesta) ──
+  fee_apr: number | null; // % fee (componente)
+  reward_apr: number | null; // % incentivo (TEMPORÁRIO)
+  il_pct: number | null; // % IL na janela (0 = sem IL; null = aplicável mas não medido)
+  cost_apr: number | null;
+  net_window_pct: number | null; // resultado líquido NA janela
+  net_apr: number | null; // % anualizado líquido
+  net_apy: number | null; // % composto líquido (headline)
+  range_low: number | null;
+  range_high: number | null;
+  window_days: number | null;
+  exposure: string | null;
+  il_risk: string | null;
   updated_at: string;
 }
 

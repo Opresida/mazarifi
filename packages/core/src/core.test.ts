@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ilFullRange, concentratedAmplification, ilConcentrated, ilToUsd } from './il';
-import { feeAprGross, aprNet, aprToApy } from './apy';
+import { feeAprGross, aprNet, aprToApy, netYield } from './apy';
 import { honestScoreboard } from './scoreboard';
 import { riskScore, riskBand, type RiskInput } from './risk';
 import { migrationAdvice } from './migration';
@@ -53,6 +53,26 @@ describe('APY (fee-APR honesto)', () => {
   it('APR→APY: compondo diário (n=365) APY > APR', () => {
     expect(aprToApy(0.1, 365)).toBeCloseTo(0.10516, 5);
     expect(aprToApy(0.1, 365)).toBeGreaterThan(0.1);
+  });
+});
+
+describe('netYield — LÍQUIDO de IL (o coração)', () => {
+  it('sem IL: net ≈ fee', () => {
+    const n = netYield({ feeAprPct: 5, windowDays: 7 });
+    expect(n.netApr).toBeCloseTo(5, 6);
+    expect(n.ilPct).toBe(0);
+  });
+  it('IL come o fee: fee +10% mas IL 0,5%/7d ⇒ NET negativo (a verdade que o APY esconde)', () => {
+    const n = netYield({ feeAprPct: 10, ilPct: 0.5, windowDays: 7 });
+    expect(n.netWindowPct).toBeCloseTo(-0.3082, 3);
+    expect(n.netApr).toBeCloseTo(-16.07, 1);
+    expect(n.netApr).toBeLessThan(0); // fee positivo, net NEGATIVO
+  });
+  it('incentivo entra separado e soma ao net', () => {
+    const semReward = netYield({ feeAprPct: 8, ilPct: 0.1, windowDays: 7 });
+    const comReward = netYield({ feeAprPct: 8, rewardAprPct: 4, ilPct: 0.1, windowDays: 7 });
+    expect(comReward.netApr).toBeGreaterThan(semReward.netApr);
+    expect(comReward.rewardPct).toBe(4);
   });
 });
 

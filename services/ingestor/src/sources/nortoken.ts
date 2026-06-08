@@ -1,5 +1,6 @@
 import type { Address } from 'viem';
 import { publicClient, getPoolPrice, getSwapStats, getLockPosition, poolIdFor } from '@mazarifi/chain';
+import { feeAprGross, ilFullRange } from '@mazarifi/core';
 import type { NormalizedPool } from '../types.js';
 
 const ETH_USD = 3000; // v1 constante (TODO: buscar preço real do ETH)
@@ -29,6 +30,10 @@ export async function fetchNortokenPools(): Promise<NormalizedPool[]> {
     const volumeUsd24h = (Number(stats.anchorVolumeWei) / 1e18) * ETH_USD; // REAL (ground-truth)
     const tvlUsd = (Number(lock.principalLiquidity) / 1e18) * ETH_USD * 2; // aprox: principal nos 2 lados
 
+    // fee anualizado (do volume real) + IL realizado do lançamento (1:1) ao preço atual
+    const feeAprPct = tvlUsd > 0 ? feeAprGross({ volume24hUsd: volumeUsd24h, feeTier: 0.003, activeTvlUsd: tvlUsd }) * 100 : null;
+    const ilPct = price != null && price > 0 ? Math.abs(ilFullRange(price)) * 100 : null; // r = preçoAtual/1 (launch 1:1)
+
     out.push({
       poolKey: `nortoken:${pid}`,
       source: 'nortoken',
@@ -41,6 +46,13 @@ export async function fetchNortokenPools(): Promise<NormalizedPool[]> {
       apyReward: null,
       volumeUsd24h,
       feeTier: 0.003, // pool 0,3%
+      feeAprPct,
+      rewardAprPct: null,
+      ilPct,
+      windowDays: 7, // nominal (pool recém-semeada)
+      apyMean30d: null,
+      exposure: 'multi',
+      ilRisk: 'yes',
       contractAgeDays: 1, // recém-semeada (honesto: nova = idade baixa)
       audited: true, // contrato Nortoken verificado no BaseScan
       tvlStability: 0.5,

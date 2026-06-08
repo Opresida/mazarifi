@@ -13,11 +13,8 @@ app.use(cors());
 app.get('/api/pools', async (_req, res) => {
   try {
     const rows = await sql`
-      SELECT pool_key, source, provenance, chain, project, symbol,
-             tvl_usd, apy_base, apy_reward, volume_usd_24h, fee_tier,
-             risk_score, fee_apr_honest, fee_apy_honest, net_usd, updated_at
-      FROM pools
-      ORDER BY risk_score DESC NULLS LAST, COALESCE(fee_apr_honest, apy_base, 0) DESC`;
+      SELECT * FROM pools
+      ORDER BY risk_score DESC NULLS LAST, COALESCE(net_apr, apy_base, 0) DESC`;
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: String(e) });

@@ -4,8 +4,12 @@ import { RiskBadge } from './RiskBadge';
 
 export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void }) {
   const isNT = pool.source === 'nortoken';
-  const recalc = pool.fee_apr_honest != null;
+  const hasNet = pool.net_apr != null;
   const b = riskBand(pool.risk_score);
+  const win = pool.window_days ?? 7;
+  const gross = (pool.fee_apr ?? 0) + (pool.reward_apr ?? 0);
+  const showRange = pool.range_low != null && pool.range_high != null && Math.abs(pool.range_high - pool.range_low) >= 0.1;
+  const netLabel = showRange ? `${fmtPct(pool.range_low, 1)} – ${fmtPct(pool.range_high, 1)}` : fmtPct(pool.net_apr, 1);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -37,31 +41,54 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
           </div>
         </div>
 
-        {/* rendimento */}
+        {/* rendimento LÍQUIDO — a cascata honesta */}
         <div className="mt-4 rounded-2xl border border-edge-soft bg-panel-solid p-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-2">Rendimento</p>
-          {recalc ? (
-            <div className="grid grid-cols-2 gap-3">
-              <Metric label="APR (simples)" value={fmtPct(pool.fee_apr_honest)} accent="gold" />
-              <Metric label="APY (composto diário)" value={fmtPct(pool.fee_apy_honest)} accent="iris" />
-            </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-2">Rendimento líquido</p>
+            <span className="rounded-md bg-panel-2 px-2 py-0.5 text-[10px] text-muted">janela {win}d</span>
+          </div>
+
+          {hasNet ? (
+            <>
+              <div className="mt-2">
+                <span
+                  className="font-display tnum text-3xl font-bold"
+                  style={{ color: (pool.net_apr ?? 0) < 0 ? 'var(--color-rose)' : 'var(--color-gold)' }}
+                >
+                  {netLabel}
+                </span>
+                <span className="ml-2 text-xs text-muted-2">net a.a. (faixa)</span>
+              </div>
+              <div className="mt-3 space-y-1.5 text-sm">
+                <CascadeRow label="Fee (quem troca paga)" value={`+${fmtPct(pool.fee_apr)}`} tone="pos" />
+                {pool.reward_apr ? (
+                  <CascadeRow label="Incentivo (emissão)" value={`+${fmtPct(pool.reward_apr)}`} tone="pos" tag="temporário" />
+                ) : null}
+                <CascadeRow label={`Perda impermanente (${win}d)`} value={pool.il_pct ? `−${fmtPct(pool.il_pct, 2)}` : '0%'} tone="neg" />
+                <CascadeRow label="Custos" value={pool.cost_apr ? `−${fmtPct(pool.cost_apr)}` : '~0%'} tone="neg" />
+                <div className="!mt-2 border-t border-edge-soft pt-2">
+                  <CascadeRow label="LÍQUIDO (net)" value={netLabel} tone="net" />
+                </div>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-muted-2">
+                Anualizado de uma janela real de {win}d (fee {isNT ? 'on-chain do SwapTracked' : 'DefiLlama'}) e{' '}
+                <span className="text-iris-bright">líquido de IL</span>. O IL anualizado é estimativa (é path-dependent); a
+                faixa reflete a variação 7d↔30d.
+              </p>
+            </>
           ) : (
-            <Metric label="APY reportado" value={fmtPct(pool.apy_base)} accent="muted" />
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              {pool.il_risk === 'yes' ? (
+                <>
+                  Esta pool <span className="text-rose">tem risco de IL</span> e ainda não medimos o IL dela — então
+                  mostramos só o <span className="text-gold">reportado ({fmtPct(pool.apy_base)})</span> e{' '}
+                  <b>não fingimos</b> que é líquido. Medir o IL é o próximo refinamento.
+                </>
+              ) : (
+                <>Reportado: <span className="text-gold">{fmtPct(pool.apy_base)}</span>.</>
+              )}
+            </p>
           )}
-          <p className="mt-3 text-xs leading-relaxed text-muted-2">
-            {recalc ? (
-              <>
-                <span className="text-iris-bright">Recalculado por nós</span> a partir de volume/fee/TVL reais
-                {isNT && ' (volume on-chain do evento SwapTracked — ground-truth)'}. APY ≥ APR porque assume
-                reinvestimento diário.
-              </>
-            ) : (
-              <>
-                <span className="text-gold">Número reportado pelo DefiLlama</span> — ainda não recalculamos esta pool
-                on-chain (próximo passo). Por isso marcamos a proveniência.
-              </>
-            )}
-          </p>
         </div>
 
         {/* números */}
@@ -72,14 +99,13 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
           <Metric label="Proveniência" value={pool.provenance} />
         </div>
 
-        {/* placar honesto */}
-        <div className="mt-4 rounded-2xl border border-dashed border-edge bg-transparent p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-2">Placar honesto (fees − IL)</p>
-          <p className="mt-1 text-sm text-muted">
-            Em breve: o resultado REAL de ser LP (taxas ganhas − perda impermanente). Precisa de histórico de preço —
-            é o que separa "APY bonito" de "lucro de verdade".
+        {/* nota honesta de CL (Fase C pendente) */}
+        {(pool.exposure === 'multi' || isNT) && (
+          <p className="mt-4 rounded-xl border border-dashed border-edge p-3 text-xs leading-relaxed text-muted-2">
+            ⚠ Em liquidez concentrada o número assume a posição <b>dentro do range</b> (fora do range = 0 fee). Backtest de
+            range e custos de rebalanceamento entram no próximo refinamento — não fingimos precisão que ainda não temos.
           </p>
-        </div>
+        )}
 
         {isNT && (
           <p className="mt-4 rounded-xl bg-iris/10 p-3 text-xs text-iris-bright ring-1 ring-iris/20">
@@ -87,6 +113,21 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
           </p>
         )}
       </aside>
+    </div>
+  );
+}
+
+function CascadeRow({ label, value, tone, tag }: { label: string; value: string; tone: 'pos' | 'neg' | 'net'; tag?: string }) {
+  const color = tone === 'net' ? 'var(--color-gold)' : tone === 'neg' ? 'var(--color-rose)' : 'var(--color-ftext)';
+  return (
+    <div className="flex items-center justify-between">
+      <span className={tone === 'net' ? 'font-semibold text-ftext' : 'text-muted'}>
+        {label}
+        {tag && <span className="ml-2 rounded bg-rose/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-rose">{tag}</span>}
+      </span>
+      <span className="font-display tnum font-semibold" style={{ color }}>
+        {value}
+      </span>
     </div>
   );
 }

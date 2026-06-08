@@ -48,3 +48,43 @@ export function aprToApy(apr: number, periodsPerYear = 365): number {
   if (periodsPerYear <= 0) return apr;
   return Math.pow(1 + apr / periodsPerYear, periodsPerYear) - 1;
 }
+
+/**
+ * O CORAÇÃO DA MAZARI FI — rendimento LÍQUIDO de perda impermanente.
+ * Combina sobre a MESMA janela: fee + incentivo − IL − custos = net DA JANELA (a verdade crua),
+ * depois anualiza (estimativa, pois IL é path-dependent) e compõe. NUNCA exibir fee sem descontar IL.
+ *
+ * Convenção: `feeAprPct`/`rewardAprPct` já anualizados (%); `ilPct`/`costPct` = PERDA % sobre a janela (≥0).
+ * Golden: feeApr 10%, IL 0,5% em 7d ⇒ netWindow = 10×7/365 − 0,5 = −0,308% ⇒ netApr −16% (fee positivo, NET negativo).
+ */
+export interface NetYieldInput {
+  feeAprPct: number;
+  rewardAprPct?: number;
+  ilPct?: number; // perda % sobre a janela (≥0)
+  costPct?: number; // perda % sobre a janela (≥0)
+  windowDays?: number; // janela do IL/realizado (default 7)
+  harvestPerYear?: number; // freq de reinvest p/ APY (default 365)
+}
+export interface NetYield {
+  feePct: number;
+  rewardPct: number;
+  ilPct: number;
+  costPct: number;
+  netWindowPct: number; // resultado líquido NA JANELA — a verdade não-anualizada
+  netApr: number; // anualizado (estimativa)
+  netApy: number; // composto (estimativa rotulada)
+  windowDays: number;
+}
+export function netYield(i: NetYieldInput): NetYield {
+  const windowDays = i.windowDays && i.windowDays > 0 ? i.windowDays : 7;
+  const feePct = i.feeAprPct || 0;
+  const rewardPct = i.rewardAprPct || 0;
+  const ilPct = Math.max(0, i.ilPct || 0);
+  const costPct = Math.max(0, i.costPct || 0);
+  const feeWindow = (feePct * windowDays) / 365;
+  const rewardWindow = (rewardPct * windowDays) / 365;
+  const netWindowPct = feeWindow + rewardWindow - ilPct - costPct;
+  const netApr = (netWindowPct * 365) / windowDays;
+  const netApy = aprToApy(netApr / 100, i.harvestPerYear ?? 365) * 100;
+  return { feePct, rewardPct, ilPct, costPct, netWindowPct, netApr, netApy, windowDays };
+}

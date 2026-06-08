@@ -29,7 +29,7 @@ export function App() {
   }, []);
 
   const view = useMemo(() => {
-    const yieldOf = (p: Pool) => p.fee_apr_honest ?? p.apy_base ?? 0;
+    const yieldOf = (p: Pool) => p.net_apr ?? p.apy_base ?? 0;
     return pools
       .filter((p) => (src === 'all' ? true : p.source === src))
       .filter((p) => {
@@ -77,8 +77,8 @@ export function App() {
 
         {/* ── Faixa de honestidade (o diferencial) ── */}
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 rounded-2xl border border-edge-soft bg-panel-solid/60 px-4 py-3 text-xs text-muted">
-          <span><b className="text-gold">APR</b> = simples · <b className="text-iris-bright">APY</b> = composto diário (sempre os dois)</span>
-          <span><b className="text-iris-bright">recalc</b> = nós calculamos on-chain · <b className="text-muted">reportado</b> = DefiLlama</span>
+          <span><b className="text-gold">net</b> = fee + incentivo <b className="text-rose">− IL</b> − custos (o número que importa)</span>
+          <span>sempre <b className="text-iris-bright">líquido de perda impermanente</b>, com a janela do lado</span>
           <span>risco = mesma régua p/ todas (Nortoken não ganha bônus)</span>
         </div>
 
@@ -129,7 +129,10 @@ export function App() {
 
 function Row({ pool, onClick }: { pool: Pool; onClick: () => void }) {
   const isNT = pool.source === 'nortoken';
-  const recalc = pool.fee_apr_honest != null;
+  const hasNet = pool.net_apr != null;
+  const showRange = pool.range_low != null && pool.range_high != null && Math.abs(pool.range_high - pool.range_low) >= 0.1;
+  const netLabel = showRange ? `${fmtPct(pool.range_low, 1)}–${fmtPct(pool.range_high, 1)}` : fmtPct(pool.net_apr, 1);
+  const netNeg = (pool.net_apr ?? 0) < 0;
   return (
     <button
       onClick={onClick}
@@ -153,17 +156,19 @@ function Row({ pool, onClick }: { pool: Pool; onClick: () => void }) {
       <span className="tnum text-right text-sm text-ftext">{fmtUsd(pool.tvl_usd)}</span>
       <span className="tnum hidden text-right text-sm text-muted sm:block">{fmtUsd(pool.volume_usd_24h)}</span>
       <div className="text-right">
-        {recalc ? (
+        {hasNet ? (
           <div className="tnum leading-tight">
-            <span className="font-display font-semibold text-gold">{fmtPct(pool.fee_apr_honest)}</span>
-            <span className="text-muted-2"> / </span>
-            <span className="font-display font-semibold text-iris-bright">{fmtPct(pool.fee_apy_honest)}</span>
-            <p className="text-[10px] text-iris-bright/70">APR / APY · recalc</p>
+            <span className="font-display font-semibold" style={{ color: netNeg ? 'var(--color-rose)' : 'var(--color-gold)' }}>
+              {netLabel}
+            </span>
+            <p className="text-[10px] text-muted-2">
+              net{pool.il_pct ? ` · −IL ${fmtPct(pool.il_pct, 2)}` : ''} · {pool.window_days ?? 7}d
+            </p>
           </div>
         ) : (
           <div className="tnum leading-tight">
             <span className="font-display font-semibold text-ftext">{fmtPct(pool.apy_base)}</span>
-            <p className="text-[10px] text-muted-2">APY · reportado</p>
+            <p className="text-[10px] text-muted-2">{pool.il_risk === 'yes' ? '⚠ IL não medido' : 'reportado'}</p>
           </div>
         )}
       </div>
