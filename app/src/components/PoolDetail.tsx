@@ -72,8 +72,9 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
               </div>
               <p className="mt-3 text-xs leading-relaxed text-muted-2">
                 Anualizado de uma janela real de {win}d (fee {isNT ? 'on-chain do SwapTracked' : 'DefiLlama'}) e{' '}
-                <span className="text-iris-bright">líquido de IL</span>. O IL anualizado é estimativa (é path-dependent); a
-                faixa reflete a variação 7d↔30d.
+                <span className="text-iris-bright">líquido de IL</span>. A faixa ={' '}
+                <span className="text-rose">sem o incentivo</span> (se a emissão secar) ↔ <span className="text-gold">com o
+                incentivo hoje</span> — porque incentivo é frágil.
               </p>
             </>
           ) : (

@@ -62,7 +62,7 @@ async function main() {
   const ranked = [...all].sort((a, b) => b.riskScore - a.riskScore || netOf(b) - netOf(a));
 
   console.log('=== TOP 15 (risco + rendimento LÍQUIDO de IL · cego à origem) ===');
-  console.log('net = fee + incentivo − IL − custos (anualizado da janela) · faixa = 7d↔30d\n');
+  console.log('net = fee + incentivo − IL − custos (anualizado da janela) · faixa = sem↔com incentivo\n');
   for (const p of ranked.slice(0, 15)) {
     const net =
       p.netApr != null

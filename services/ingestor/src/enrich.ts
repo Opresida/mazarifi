@@ -41,16 +41,15 @@ export function enrich(p: NormalizedPool): EnrichedPool {
   // Só computa NET quando temos o IL de verdade (incl. IL=0). ilRisk=yes sem IL calculado ⇒ net null
   // (a UI mostra "IL pendente" em vez de forjar fee-como-net — a mentira que evitamos).
   if (feeApr != null && ilPctOut != null) {
-    const args = { rewardAprPct: rewardApr ?? 0, ilPct: ilPctOut, costPct: costApr, windowDays: p.windowDays };
-    const n = netYield({ feeAprPct: feeApr, ...args });
-    netWindowPct = n.netWindowPct;
-    netApr = n.netApr;
-    netApy = n.netApy;
-    // faixa: fee da janela (7d) vs média 30d → dois nets reais
-    const altNet = p.apyMean30d != null ? netYield({ feeAprPct: p.apyMean30d, ...args }).netApr : null;
-    const pts = [netApr, altNet].filter((x): x is number => x != null);
-    rangeLow = Math.min(...pts);
-    rangeHigh = Math.max(...pts);
+    const base = { ilPct: ilPctOut, costPct: costApr, windowDays: p.windowDays };
+    const comReward = netYield({ feeAprPct: feeApr, rewardAprPct: rewardApr ?? 0, ...base });
+    const semReward = netYield({ feeAprPct: feeApr, rewardAprPct: 0, ...base });
+    netWindowPct = comReward.netWindowPct;
+    netApr = comReward.netApr;
+    netApy = comReward.netApy;
+    // faixa HONESTA: incentivo é frágil → low = se o incentivo sumir; high = com incentivo hoje
+    rangeLow = Math.min(comReward.netApr, semReward.netApr);
+    rangeHigh = Math.max(comReward.netApr, semReward.netApr);
   }
 
   return { ...p, riskScore: rs, feeApr, rewardApr, ilPctOut, costApr, netWindowPct, netApr, netApy, rangeLow, rangeHigh };

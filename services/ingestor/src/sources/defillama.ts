@@ -101,8 +101,9 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
       apyReward: p.apyReward ?? null,
       volumeUsd24h: p.volumeUsd1d ?? null,
       feeTier: null,
-      // rendimento líquido (janela 7d real do DefiLlama)
-      feeAprPct: p.apyBase7d ?? p.apyBase ?? p.apy ?? null,
+      // FEE só do componente de fee (apyBase7d/apyBase). NUNCA cai pro `apy` total
+      // (isso double-contava o incentivo). Pool movida a emissão (apyBase null) ⇒ fee 0.
+      feeAprPct: (p.apyBase7d ?? p.apyBase) ?? (p.apyReward != null ? 0 : null),
       rewardAprPct: p.apyReward ?? null,
       ilPct,
       windowDays: 7,
