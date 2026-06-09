@@ -100,21 +100,46 @@ export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: Ne
           )}
         </div>
 
-        {/* incentivo é "papel" — o custo mais traiçoeiro */}
-        {hasReward && (
-          <div className="mt-3 rounded-2xl border border-rose/30 bg-rose/8 p-4 text-xs leading-relaxed text-rose">
-            <p className="font-semibold">
-              ⚠ Cuidado: parte desse rendimento é incentivo{pool.reward_symbol ? <> pago em <span className="text-ftext">{pool.reward_symbol}</span></> : ' (token de recompensa)'}.
-            </p>
-            <p className="mt-1 text-rose/90">
-              Incentivo é <b>frágil</b>: pra receber de verdade você precisa <b>vender {pool.reward_symbol ?? 'esse token'}</b> (mais swap + gás) e ele{' '}
-              <b>pode despencar</b> antes. Se a emissão secar, some.
-            </p>
-            <p className="mt-2 rounded-lg bg-ink/40 px-2.5 py-1.5 text-ftext">
-              Sem o incentivo (só fee − IL), rendeu <b className="text-safe">{`${floor >= 0 ? '+' : ''}${floor.toFixed(2)}%`}</b> nesses {win} dias — esse é o piso seguro.
-            </p>
-          </div>
-        )}
+        {/* incentivo: informar a SOLIDEZ do token, não assustar à toa */}
+        {hasReward &&
+          (() => {
+            const ri = pool.reward_integrity;
+            const label = ri?.label ?? 'Razoável';
+            const sym = pool.reward_symbol ?? 'um token';
+            const tone =
+              label === 'Sólido'
+                ? { box: 'border-safe/30 bg-safe/8 text-safe', emoji: '🟢', head: 'token sólido' }
+                : label === 'Cuidado'
+                  ? { box: 'border-rose/30 bg-rose/8 text-rose', emoji: '🔴', head: 'cuidado com esse token' }
+                  : { box: 'border-gold/30 bg-gold/8 text-gold', emoji: '🟡', head: 'token razoável' };
+            const facts: string[] = [];
+            if (ri?.mcapUsd) facts.push(`${fmtUsd(ri.mcapUsd)} de mercado`);
+            if (ri?.confidence != null) facts.push(`liquidez ${Math.round(ri.confidence * 100)}%`);
+            if (ri?.ageDays != null) facts.push(ri.ageDays >= 365 ? `${Math.floor(ri.ageDays / 365)}+ ano(s) no mercado` : `${Math.round(ri.ageDays / 30)} meses no mercado`);
+            if (ri?.verified) facts.push('contrato verificado');
+            if (ri?.knownProtocol) facts.push('protocolo conhecido');
+            return (
+              <div className={`mt-3 rounded-2xl border p-4 text-xs leading-relaxed ${tone.box}`}>
+                <p className="font-semibold">
+                  {tone.emoji} Incentivo pago em <span className="text-ftext">{sym}</span> — {tone.head}.
+                </p>
+                {facts.length > 0 && <p className="mt-1 opacity-90">{facts.join(' · ')}.</p>}
+                <p className="mt-1.5 opacity-90">
+                  {label === 'Sólido' ? (
+                    <>Mesmo sólido, o incentivo é separado do principal — dá pra <b>realizar (vender {sym})</b> de tempos em tempos pra travar o ganho.</>
+                  ) : (
+                    <>Incentivo é <b>frágil</b>: você precisa <b>vender {sym}</b> (mais swap + gás) e ele <b>pode cair</b>. Se a emissão secar, some.</>
+                  )}
+                </p>
+                <p className="mt-2 rounded-lg bg-ink/40 px-2.5 py-1.5 text-ftext">
+                  Sem o incentivo (só fee − IL), rendeu <b className="text-safe">{`${floor >= 0 ? '+' : ''}${floor.toFixed(2)}%`}</b> nesses {win} dias — o piso seguro.
+                </p>
+                {ri && ri.verified == null && (
+                  <p className="mt-1.5 text-[10px] text-muted-2">Idade e contrato verificado entram com a chave Etherscan (grátis). Auditoria: confira no site do projeto.</p>
+                )}
+              </div>
+            );
+          })()}
 
         {/* números */}
         <div className="mt-4 grid grid-cols-2 gap-3">

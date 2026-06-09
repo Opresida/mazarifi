@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ilFullRange, concentratedAmplification, ilConcentrated, ilToUsd } from './il';
 import { feeAprGross, aprNet, aprToApy, netYield, windowReturn, entryExitCostPct } from './apy';
 import { gasCostUsd, priceImpactPct, OP_GAS } from './gas';
+import { tokenIntegrity } from './token';
 import { honestScoreboard } from './scoreboard';
 import { riskScore, riskBand, type RiskInput } from './risk';
 import { migrationAdvice } from './migration';
@@ -121,6 +122,25 @@ describe('priceImpactPct — slippage estimado do swap de entrada', () => {
   });
   it('sem TVL → 0 (não inventa)', () => {
     expect(priceImpactPct({ amountUsd: 1000, tvlUsd: null })).toBe(0);
+  });
+});
+
+describe('tokenIntegrity — solidez do token de incentivo', () => {
+  it('AERO ($312M, conf 0,99, tracked) → Sólido', () => {
+    const t = tokenIntegrity({ mcapUsd: 312_000_000, confidence: 0.99, tracked: true });
+    expect(t.label).toBe('Sólido');
+    expect(t.score).toBeGreaterThan(55);
+  });
+  it('token pequeno e ilíquido → Cuidado', () => {
+    expect(tokenIntegrity({ mcapUsd: 500_000, confidence: 0.3, tracked: true }).label).toBe('Cuidado');
+  });
+  it('não rastreado pelo DefiLlama → Cuidado', () => {
+    expect(tokenIntegrity({ mcapUsd: null, confidence: null, tracked: false }).label).toBe('Cuidado');
+  });
+  it('idade + verificado elevam o score', () => {
+    const base = tokenIntegrity({ mcapUsd: 80_000_000, confidence: 0.92, tracked: true });
+    const rich = tokenIntegrity({ mcapUsd: 80_000_000, confidence: 0.92, tracked: true, ageDays: 500, verified: true, knownProtocol: true });
+    expect(rich.score).toBeGreaterThan(base.score);
   });
 });
 

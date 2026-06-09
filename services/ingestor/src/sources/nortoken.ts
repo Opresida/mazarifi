@@ -52,6 +52,7 @@ export async function fetchNortokenPools(): Promise<NormalizedPool[]> {
       feeReturn15d,
       rewardReturn15d: 0,
       rewardSymbol: null,
+      rewardIntegrity: null,
       ilPct15d,
       volLow: feeAprPct,
       volHigh: feeAprPct,

@@ -5,6 +5,7 @@
 export * from './il.js';
 export * from './apy.js';
 export * from './gas.js';
+export * from './token.js';
 export * from './scoreboard.js';
 export * from './risk.js';
 export * from './migration.js';

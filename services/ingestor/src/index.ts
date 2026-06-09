@@ -47,6 +47,7 @@ async function main() {
       feeReturn15d: p.feeReturn15d,
       rewardReturn15d: p.rewardReturn15d,
       rewardSymbol: p.rewardSymbol,
+      rewardIntegrity: p.rewardIntegrity as object | null,
       il15d: p.ilPct15d,
       volLow: p.volLow,
       volHigh: p.volHigh,

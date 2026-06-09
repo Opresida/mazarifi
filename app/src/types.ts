@@ -4,6 +4,20 @@ export interface BestPicks {
   trade: Pool | null;
 }
 
+/** Solidez do token de incentivo (ex.: AERO) — pra informar, não assustar. */
+export interface RewardIntegrity {
+  token: string;
+  symbol: string | null;
+  mcapUsd: number | null;
+  confidence: number | null;
+  ageDays: number | null;
+  verified: boolean | null;
+  knownProtocol: boolean;
+  score: number;
+  label: 'Sólido' | 'Razoável' | 'Cuidado';
+  reasons: string[];
+}
+
 /** Gás AO VIVO da Base + preço do ETH (custo de gás por tipo de operação, em US$). */
 export interface NetworkInfo {
   gas_price_gwei: number | null;
@@ -33,6 +47,7 @@ export interface Pool {
   fee_return_15d: number | null; // fee realizado em 15d
   reward_return_15d: number | null; // incentivo realizado em 15d (TEMPORÁRIO)
   reward_symbol: string | null; // token do incentivo (ex.: 'AERO')
+  reward_integrity: RewardIntegrity | null; // solidez do token de incentivo
   il_15d: number | null; // % IL em 15d (0 = sem IL; null = aplicável mas não medido)
   vol_low: number | null; // apyBase mínimo nos 15d (%)
   vol_high: number | null; // apyBase máximo nos 15d (%)

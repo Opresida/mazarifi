@@ -1,8 +1,12 @@
 import { ChevronRight } from 'lucide-react';
-import type { Pool } from '../types';
+import type { Pool, RewardIntegrity } from '../types';
 import { fmtUsd } from '../lib/format';
 import { poolReturn15d, poolAnnual, poolName, isConcentrated, isVolatile } from '../lib/pool';
 import { RiskPill } from './atoms';
+
+const rewardColor = (label?: RewardIntegrity['label']) =>
+  label === 'Sólido' ? 'var(--color-safe)' : label === 'Cuidado' ? 'var(--color-risky)' : 'var(--color-gold)';
+const rewardDot = (label?: RewardIntegrity['label']) => (label === 'Sólido' ? '🟢' : label === 'Cuidado' ? '🔴' : '🟡');
 
 export function OpportunityCard({ pool, onOpen, rank }: { pool: Pool; onOpen: () => void; rank?: number }) {
   const ret = poolReturn15d(pool);
@@ -18,6 +22,18 @@ export function OpportunityCard({ pool, onOpen, rank }: { pool: Pool; onOpen: ()
           {rank != null && <span className="font-display text-xs text-muted-2">#{rank}</span>}
           <span className="truncate font-display font-semibold text-ftext">{poolName(pool)}</span>
           <span className="shrink-0 rounded bg-ink px-1.5 py-0.5 text-[10px] text-muted-2">{pool.chain}</span>
+          {pool.reward_symbol && (
+            <span
+              className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{
+                color: rewardColor(pool.reward_integrity?.label),
+                background: 'color-mix(in srgb, currentColor 14%, transparent)',
+              }}
+              title={`Incentivo em ${pool.reward_symbol}${pool.reward_integrity ? ` — ${pool.reward_integrity.label}` : ''}`}
+            >
+              +{pool.reward_symbol} {rewardDot(pool.reward_integrity?.label)}
+            </span>
+          )}
         </div>
         <RiskPill score={pool.risk_score} />
       </div>

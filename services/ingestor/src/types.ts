@@ -1,4 +1,5 @@
 import type { PoolSource } from '@mazarifi/core';
+import type { RewardIntegrity } from './sources/rewardTokens.js';
 
 /** Pool normalizada (qualquer fonte) + dimensões de risco + rendimento REALIZADO em 15 dias. */
 export interface NormalizedPool {
@@ -17,6 +18,7 @@ export interface NormalizedPool {
   feeReturn15d: number | null; // fee realizado em 15d
   rewardReturn15d: number | null; // incentivo realizado em 15d (TEMPORÁRIO)
   rewardSymbol: string | null; // token(s) em que o incentivo é pago (ex.: 'AERO')
+  rewardIntegrity: RewardIntegrity | null; // solidez do token de incentivo
   ilPct15d: number | null; // IL realizado em 15d (0 = sem IL; null = aplicável mas não medido)
   volLow: number | null; // apyBase mínimo nos 15d (%) — volatilidade
   volHigh: number | null; // apyBase máximo nos 15d (%)

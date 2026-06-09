@@ -20,6 +20,7 @@ export const pools = pgTable('pools', {
   feeReturn15d: doublePrecision('fee_return_15d'),
   rewardReturn15d: doublePrecision('reward_return_15d'),
   rewardSymbol: text('reward_symbol'), // token do incentivo (ex.: 'AERO')
+  rewardIntegrity: jsonb('reward_integrity'), // solidez do token de incentivo (mcap/conf/idade/verified/label)
   il15d: doublePrecision('il_15d'),
   volLow: doublePrecision('vol_low'),
   volHigh: doublePrecision('vol_high'),

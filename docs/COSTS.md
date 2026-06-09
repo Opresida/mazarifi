@@ -13,7 +13,8 @@
 | **Slippage / impacto no preço** | `lib/money.priceImpactPct` (aviso) | aprox. constant-product `(amount/2)/tvl`; **aviso** quando o valor é grande pra pool (não número fingido) |
 
 ## ⚠️ SINALIZADO na UI (custo real, sem fingir número exato)
-- **Incentivo é "papel":** a recompensa vem em OUTRO token → pra realizar você **vende** (mais swap+slippage+gás) e o token **pode despencar** antes. Já separamos `fee_return_15d` × `reward_return_15d`; o "piso" (fee − IL, sem incentivo) é o número conservador.
+- **Incentivo é "papel":** a recompensa vem em OUTRO token → pra realizar você **vende** (mais swap+slippage+gás). Em vez de assustar sempre, **checamos a solidez do token** (`reward_integrity`): **mcap + liquidez (DefiLlama, grátis) + idade + verificado (Etherscan, chave grátis opcional) + protocolo conhecido** → veredito **Sólido / Razoável / Cuidado**. AERO = Sólido ($312M, 99% liquidez). Mostramos sempre o **piso** (fee − IL, sem incentivo) como número conservador.
+  - **"Auditado" é honesto:** auditoria é **off-chain** (PDF de firma) — **não** afirmamos automaticamente. Marcamos "protocolo conhecido" (lista curada) e orientamos conferir no site do projeto.
 - **CL fora do range:** pools concentradas assumem posição **dentro do range**; fora dele = 0 fee. Sinalizado com selo "concentrada / assume in-range".
 - **Lockup / carência de saída:** alguns protocolos seguram o saque — sinalizar quando o dado existir.
 
