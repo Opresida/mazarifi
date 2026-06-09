@@ -34,3 +34,12 @@ export interface Stats {
   tvl_total: number;
   updated_at: string | null;
 }
+
+export interface AdminMetrics {
+  pools: number;
+  tvl_total: number;
+  avg_risk: number;
+  updated_at: string | null;
+  byChain: { chain: string; pools: number; tvl: number }[];
+  byRisk: { band: string; n: number }[];
+}
