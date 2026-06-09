@@ -18,6 +18,12 @@ export async function fetchBest(): Promise<BestPicks> {
   return r.json();
 }
 
+export async function fetchPool(key: string): Promise<Pool | null> {
+  const r = await fetch(`/api/pool/${encodeURIComponent(key)}`);
+  if (!r.ok) throw new Error(`API /pool ${r.status}`);
+  return r.json();
+}
+
 export async function fetchNetwork(): Promise<NetworkInfo | null> {
   const r = await fetch('/api/network');
   if (!r.ok) throw new Error(`API /network ${r.status}`);

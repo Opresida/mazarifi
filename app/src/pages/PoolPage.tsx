@@ -1,0 +1,191 @@
+import { useEffect, useState } from 'react';
+import { Link, useRoute } from 'wouter';
+import { Home, Compass, Wallet, Clock, ArrowLeft, ExternalLink, CheckCircle2, AlertTriangle, MinusCircle, ArrowRight } from 'lucide-react';
+import type { Pool, NetworkInfo } from '../types';
+import { fetchPool, fetchPools, fetchNetwork } from '../api';
+import { Shell, type NavItem } from '../components/Shell';
+import { Card } from '../components/atoms';
+import { PoolDetailContent } from '../components/PoolDetail';
+import { WalletButton } from '../components/WalletButton';
+import { buildChecklist, type CheckItem } from '../lib/checklist';
+import { bestAlternative, migrationAdvice } from '../lib/migration';
+import { poolAnnual, poolName, poolEntryCostPct, poolGasUsd } from '../lib/pool';
+import { fmtUsdExact } from '../lib/format';
+
+const NAV: NavItem[] = [
+  { path: '/dashboard', label: 'Início', icon: Home },
+  { path: '/dashboard', label: 'Oportunidades', icon: Compass },
+  { path: '/dashboard', label: 'Minha aplicação', icon: Wallet },
+  { path: '/dashboard', label: 'Histórico', icon: Clock },
+];
+
+const PROTOCOL_URL: Record<string, string> = {
+  aerodrome: 'https://aerodrome.finance/',
+  uniswap: 'https://app.uniswap.org/',
+  aave: 'https://app.aave.com/',
+  morpho: 'https://app.morpho.org/',
+  curve: 'https://curve.fi/',
+  balancer: 'https://balancer.fi/pools',
+  pendle: 'https://app.pendle.finance/',
+  compound: 'https://app.compound.finance/',
+  moonwell: 'https://moonwell.fi/',
+  spark: 'https://app.spark.fi/',
+  fluid: 'https://fluid.io/',
+  sushiswap: 'https://www.sushi.com/pool',
+};
+function protocolUrl(project: string): string | null {
+  const p = project.toLowerCase();
+  for (const k of Object.keys(PROTOCOL_URL)) if (p.includes(k)) return PROTOCOL_URL[k];
+  return null;
+}
+
+export function PoolPage() {
+  const [, params] = useRoute('/pool/:key');
+  const key = params?.key ? decodeURIComponent(params.key) : '';
+  const [pool, setPool] = useState<Pool | null>(null);
+  const [all, setAll] = useState<Pool[]>([]);
+  const [net, setNet] = useState<NetworkInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!key) return;
+    setLoading(true);
+    Promise.all([fetchPool(key), fetchPools(), fetchNetwork().catch(() => null)])
+      .then(([p, a, n]) => {
+        setPool(p);
+        setAll(a);
+        setNet(n);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [key]);
+
+  return (
+    <Shell nav={NAV} topRight={<WalletButton />}>
+      <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ftext">
+        <ArrowLeft size={14} /> Voltar pras oportunidades
+      </Link>
+      {loading ? (
+        <p className="py-10 text-center text-sm text-muted-2">Carregando…</p>
+      ) : !pool ? (
+        <p className="py-10 text-center text-sm text-muted-2">Oportunidade não encontrada.</p>
+      ) : (
+        <>
+          <h1 className="mt-3 font-display text-2xl font-bold text-ftext">{poolName(pool)}</h1>
+          <p className="mt-0.5 text-sm text-muted">{pool.project} · {pool.chain}</p>
+          <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
+            <div className="min-w-0">
+              <PoolDetailContent pool={pool} net={net} />
+              <ChecklistCard pool={pool} />
+            </div>
+            <div className="space-y-4">
+              <HowToEnterCard pool={pool} />
+              <MigrationCard pool={pool} all={all} net={net} />
+            </div>
+          </div>
+        </>
+      )}
+    </Shell>
+  );
+}
+
+function CheckIcon({ status }: { status: CheckItem['status'] }) {
+  if (status === 'ok') return <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-safe" />;
+  if (status === 'warn') return <AlertTriangle size={16} className="mt-0.5 shrink-0 text-gold" />;
+  return <MinusCircle size={16} className="mt-0.5 shrink-0 text-muted-2" />;
+}
+
+function ChecklistCard({ pool }: { pool: Pool }) {
+  const items = buildChecklist(pool);
+  const srcLabel: Record<CheckItem['source'], string> = { auto: 'automático', curado: 'curado', pendente: 'pendente' };
+  return (
+    <Card className="mt-4 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-2">O que a gente verificou</p>
+      <div className="mt-3 space-y-3">
+        {items.map((it) => (
+          <div key={it.label} className="flex items-start gap-2.5">
+            <CheckIcon status={it.status} />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ftext">
+                {it.label}
+                <span className="ml-2 rounded bg-ink px-1.5 py-0.5 text-[9px] uppercase text-muted-2">{srcLabel[it.source]}</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-muted-2">{it.note}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 border-t border-edge-soft pt-2 text-[10px] leading-relaxed text-muted-2">
+        Passar nessas checagens <b>não garante</b> segurança total — ajuda na sua análise. "Pendente" = ainda não checamos automaticamente (não fingimos que checamos).
+      </p>
+    </Card>
+  );
+}
+
+function HowToEnterCard({ pool }: { pool: Pool }) {
+  const url = protocolUrl(pool.project);
+  const isNT = pool.source === 'nortoken';
+  return (
+    <Card className="glow-lime border-lime/30 p-4">
+      <p className="text-sm font-semibold text-ftext">Como entrar</p>
+      {isNT ? (
+        <p className="mt-2 text-xs leading-relaxed text-muted">Pool Nortoken (testnet/demo) — entrada pela Mazari Fi chega na próxima fase.</p>
+      ) : (
+        <>
+          <ol className="mt-2 space-y-1.5 text-xs leading-relaxed text-muted">
+            <li><b className="text-ftext">1.</b> Conecte sua carteira no app da {pool.project}.</li>
+            <li><b className="text-ftext">2.</b> Procure a oportunidade <b className="text-ftext">{poolName(pool)}</b>.</li>
+            <li><b className="text-ftext">3.</b> Deposite e confirme — lembrando do custo de entrada que mostramos acima.</li>
+          </ol>
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-semibold text-ink hover:bg-lime-bright"
+            >
+              Abrir {pool.project} <ExternalLink size={15} />
+            </a>
+          )}
+          <p className="mt-3 rounded-lg bg-iris/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-iris-bright">
+            🔜 Em breve: deposite 1 token aqui e a gente monta a pool pra você — sem custódia (você assina da sua carteira).
+          </p>
+        </>
+      )}
+    </Card>
+  );
+}
+
+function MigrationCard({ pool, all, net }: { pool: Pool; all: Pool[]; net: NetworkInfo | null }) {
+  const alt = bestAlternative(pool, all);
+  if (!alt) {
+    return (
+      <Card className="p-4">
+        <p className="text-sm font-semibold text-ftext">Radar de migração</p>
+        <p className="mt-2 text-xs leading-relaxed text-muted">✓ Esta já é a melhor do tipo agora — não há troca que compense.</p>
+      </Card>
+    );
+  }
+  const amount = 1000;
+  const annA = poolAnnual(pool) ?? 0;
+  const annB = poolAnnual(alt) ?? 0;
+  const switchCost = (amount * (poolEntryCostPct(pool) + poolEntryCostPct(alt))) / 100 + poolGasUsd(pool, net) + poolGasUsd(alt, net);
+  const adv = migrationAdvice((amount * annA) / 100, (amount * annB) / 100, switchCost, 365);
+  return (
+    <Card className="p-4">
+      <p className="text-sm font-semibold text-ftext">Radar de migração</p>
+      {adv.worthIt ? (
+        <p className="mt-2 text-xs leading-relaxed text-muted">
+          Tem opção melhor: <b className="text-ftext">{poolName(alt)}</b> rende ≈<b className="text-lime">{annB.toFixed(0)}%/ano</b> (+{(annB - annA).toFixed(0)} p.p.). Trocando (ref. $1.000): custa ~{fmtUsdExact(switchCost)}, e <b>se paga em ~{Math.ceil(adv.paybackDays)} dias</b>.
+        </p>
+      ) : (
+        <p className="mt-2 text-xs leading-relaxed text-muted">
+          Existe a <b className="text-ftext">{poolName(alt)}</b> rendendo um pouco mais, mas trocar <b>não compensa</b> em 1 ano — o custo da troca come o ganho extra. Fica onde está.
+        </p>
+      )}
+      <Link href={`/pool/${encodeURIComponent(alt.pool_key)}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-lime hover:text-lime-bright">
+        Ver {poolName(alt)} <ArrowRight size={13} />
+      </Link>
+    </Card>
+  );
+}

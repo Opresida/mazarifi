@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { Home, Compass, Wallet, Clock, ArrowRight, ShieldCheck, Landmark, Repeat } from 'lucide-react';
 import type { Pool, BestPicks, NetworkInfo } from '../types';
 import { fetchPools, fetchBest, fetchNetwork } from '../api';
@@ -11,7 +11,6 @@ import { Card, RiskPill, SectionTitle } from '../components/atoms';
 import { OpportunityCard } from '../components/OpportunityCard';
 import { MoneyProjector } from '../components/MoneyProjector';
 import { WalletButton } from '../components/WalletButton';
-import { PoolDetail } from '../components/PoolDetail';
 import { useWallet } from '../lib/wallet';
 
 const NAV: NavItem[] = [
@@ -30,8 +29,9 @@ export function UserDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [filters, setFilters] = useState<Set<string>>(new Set());
-  const [sel, setSel] = useState<Pool | null>(null);
   const { address, isAdmin } = useWallet();
+  const [, navigate] = useLocation();
+  const goPool = (p: Pool) => navigate(`/pool/${encodeURIComponent(p.pool_key)}`);
 
   const toggleFilter = (id: string) =>
     setFilters((prev) => {
@@ -87,8 +87,8 @@ export function UserDashboard() {
 
       {/* DOIS destaques: empréstimo (seguro) vs pool de troca (rende mais) */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <HighlightCard kind="lending" pool={best?.lending ?? null} loading={loading} onOpen={setSel} />
-        <HighlightCard kind="trade" pool={best?.trade ?? null} loading={loading} onOpen={setSel} />
+        <HighlightCard kind="lending" pool={best?.lending ?? null} loading={loading} onOpen={goPool} />
+        <HighlightCard kind="trade" pool={best?.trade ?? null} loading={loading} onOpen={goPool} />
       </div>
 
       {/* Projetor com abas: simula o ganho em cada um */}
@@ -143,7 +143,7 @@ export function UserDashboard() {
         ) : (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {list.map((p, i) => (
-              <OpportunityCard key={p.pool_key} pool={p} rank={i + 1} onOpen={() => setSel(p)} />
+              <OpportunityCard key={p.pool_key} pool={p} rank={i + 1} onOpen={() => goPool(p)} />
             ))}
           </div>
         )}
@@ -166,7 +166,6 @@ export function UserDashboard() {
         </Card>
       </div>
 
-      {sel && <PoolDetail pool={sel} net={net} onClose={() => setSel(null)} />}
     </Shell>
   );
 }

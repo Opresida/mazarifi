@@ -85,6 +85,17 @@ app.get('/api/admin/metrics', async (_req, res) => {
   }
 });
 
+/** Uma pool específica (página do ativo). key = pool_key (ex.: external:0x...). */
+app.get('/api/pool/:key', async (req, res) => {
+  try {
+    const [pool] = await sql`SELECT * FROM pools WHERE pool_key = ${req.params.key} LIMIT 1`;
+    res.json(pool ?? null);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
 /** Estado da rede: gás AO VIVO da Base + preço do ETH (1 linha). */
 app.get('/api/network', async (_req, res) => {
   try {

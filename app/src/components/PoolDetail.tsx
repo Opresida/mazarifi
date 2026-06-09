@@ -4,20 +4,6 @@ import { poolEntryCostPct, poolGasUsd } from '../lib/pool';
 import { RiskBadge } from './RiskBadge';
 
 export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: NetworkInfo | null; onClose: () => void }) {
-  const isNT = pool.source === 'nortoken';
-  const hasReturn = pool.return_15d != null;
-  const entryCost = poolEntryCostPct(pool);
-  const gasUsd = poolGasUsd(pool, net);
-  const gasTxt = gasUsd > 0 ? (gasUsd >= 0.01 ? fmtUsdExact(gasUsd) : `$${gasUsd.toFixed(4)}`) : '—';
-  const hasReward = pool.reward_return_15d != null && pool.reward_return_15d > 0;
-  const floor = (pool.fee_return_15d ?? 0) - (pool.il_15d ?? 0); // rendimento SEM o incentivo (fee − IL)
-  const b = riskBand(pool.risk_score);
-  const win = pool.window_days ?? 15;
-  const ret = pool.return_15d;
-  const retLabel = ret != null ? `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%` : '—';
-  const volBandTxt = pool.vol_low != null && pool.vol_high != null ? `${Math.round(pool.vol_low)}% a ${Math.round(pool.vol_high)}%` : null;
-  const volatile = pool.vol_low != null && pool.vol_high != null && pool.vol_low > 0 && pool.vol_high > pool.vol_low * 2.5;
-
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -36,7 +22,30 @@ export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: Ne
             ✕
           </button>
         </div>
+        <PoolDetailContent pool={pool} net={net} />
+      </aside>
+    </div>
+  );
+}
 
+/** Conteúdo reutilizável — usado no drawer e na página do ativo (`/pool/:key`). */
+export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: NetworkInfo | null }) {
+  const isNT = pool.source === 'nortoken';
+  const hasReturn = pool.return_15d != null;
+  const entryCost = poolEntryCostPct(pool);
+  const gasUsd = poolGasUsd(pool, net);
+  const gasTxt = gasUsd > 0 ? (gasUsd >= 0.01 ? fmtUsdExact(gasUsd) : `$${gasUsd.toFixed(4)}`) : '—';
+  const hasReward = pool.reward_return_15d != null && pool.reward_return_15d > 0;
+  const floor = (pool.fee_return_15d ?? 0) - (pool.il_15d ?? 0); // rendimento SEM o incentivo (fee − IL)
+  const b = riskBand(pool.risk_score);
+  const win = pool.window_days ?? 15;
+  const ret = pool.return_15d;
+  const retLabel = ret != null ? `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%` : '—';
+  const volBandTxt = pool.vol_low != null && pool.vol_high != null ? `${Math.round(pool.vol_low)}% a ${Math.round(pool.vol_high)}%` : null;
+  const volatile = pool.vol_low != null && pool.vol_high != null && pool.vol_low > 0 && pool.vol_high > pool.vol_low * 2.5;
+
+  return (
+    <>
         {/* risco */}
         <div className="mt-6 flex items-center gap-3 rounded-2xl border border-edge-soft bg-panel-solid p-4">
           <RiskBadge score={pool.risk_score} />
@@ -194,8 +203,7 @@ export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: Ne
             ⬢ Pool Nortoken — dados lidos direto da blockchain (preço, volume e posição travada). Nossa vantagem injusta.
           </p>
         )}
-      </aside>
-    </div>
+    </>
   );
 }
 
