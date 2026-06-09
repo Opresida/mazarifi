@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Home, Compass, Wallet, Clock, ArrowRight, Landmark, Repeat } from 'lucide-react';
+import { Home, Compass, Wallet, ArrowRight, Landmark, Repeat } from 'lucide-react';
 import type { Pool, BestPicks, NetworkInfo } from '../types';
 import { fetchPools, fetchBest, fetchNetwork } from '../api';
 import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand, poolEntryCostPct, poolGasUsd } from '../lib/pool';
@@ -15,10 +15,9 @@ import { WalletButton } from '../components/WalletButton';
 import { useWallet } from '../lib/wallet';
 
 const NAV: NavItem[] = [
-  { path: '/dashboard', label: 'Início', icon: Home },
-  { path: '/dashboard', label: 'Oportunidades', icon: Compass },
-  { path: '/dashboard', label: 'Minha aplicação', icon: Wallet },
-  { path: '/dashboard', label: 'Histórico', icon: Clock },
+  { anchor: 'topo', label: 'Início', icon: Home },
+  { anchor: 'oportunidades', label: 'Oportunidades', icon: Compass },
+  { anchor: 'minha-aplicacao', label: 'Minha aplicação', icon: Wallet },
 ];
 
 export function UserDashboard() {
@@ -74,7 +73,7 @@ export function UserDashboard() {
         </>
       }
     >
-      <h1 className="font-display text-2xl font-bold text-ftext">Onde seu dinheiro rende mais hoje</h1>
+      <h1 id="topo" className="scroll-mt-20 font-display text-2xl font-bold text-ftext">Onde seu dinheiro rende mais hoje</h1>
       <p className="mt-1 text-sm text-muted">
         Já com as perdas descontadas. Sem cilada, em linguagem clara.
         {(best?.lending?.updated_at ?? best?.trade?.updated_at) && (
@@ -121,7 +120,7 @@ export function UserDashboard() {
       })()}
 
       {/* Lista de oportunidades */}
-      <div className="mt-8">
+      <div id="oportunidades" className="mt-8 scroll-mt-20">
         <SectionTitle
           right={
             <input
@@ -151,7 +150,7 @@ export function UserDashboard() {
       </div>
 
       {/* Minha aplicação — posições reais + sacar */}
-      <div className="mt-8">
+      <div id="minha-aplicacao" className="mt-8 scroll-mt-20">
         <SectionTitle>Minha aplicação</SectionTitle>
         <div className="mt-3">
           <PositionsSection net={net} />
