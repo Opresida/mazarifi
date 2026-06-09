@@ -25,6 +25,7 @@ export function AdminDashboard() {
   const { isAdmin, address } = useWallet();
   const [pools, setPools] = useState<Pool[]>([]);
   const [m, setM] = useState<AdminMetrics | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -33,7 +34,7 @@ export function AdminDashboard() {
         setPools(p);
         setM(mm);
       })
-      .catch(() => {});
+      .catch(() => setError('Não consegui carregar os dados (a API está rodando na porta 3001?).'));
   }, [isAdmin]);
 
   // Gate: só carteira allowlist. Sem carteira → pede conectar; carteira não-admin → manda pro user.
@@ -52,6 +53,8 @@ export function AdminDashboard() {
         </div>
         <RefreshCw size={16} className="text-muted-2" />
       </div>
+
+      {error && <div className="mt-4 rounded-xl border border-rose/30 bg-rose/8 px-4 py-3 text-sm text-rose">{error}</div>}
 
       {/* Banner honesto */}
       <div className="mt-4 flex items-center gap-2 rounded-xl border border-iris/25 bg-iris/8 px-4 py-2.5 text-xs text-iris-bright">
@@ -74,17 +77,22 @@ export function AdminDashboard() {
             <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 border-b border-edge-soft pb-2 text-[10px] uppercase tracking-wide text-muted-2">
               <span>#</span><span>Oportunidade</span><span className="text-right">Rendeu 15d</span><span className="text-right">Aplicado</span>
             </div>
-            {top.map((p, i) => (
-              <div key={p.pool_key} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b border-edge-soft/60 py-2.5 text-sm last:border-0">
-                <span className="text-muted-2">{i + 1}</span>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-ftext">{poolName(p)}</p>
-                  <p className="truncate text-[11px] text-muted-2">{p.project} · {p.chain}</p>
+            {top.map((p, i) => {
+              const r = poolReturn15d(p);
+              return (
+                <div key={p.pool_key} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b border-edge-soft/60 py-2.5 text-sm last:border-0">
+                  <span className="text-muted-2">{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-ftext">{poolName(p)}</p>
+                    <p className="truncate text-[11px] text-muted-2">{p.project} · {p.chain}</p>
+                  </div>
+                  <span className="tnum text-right font-semibold" style={{ color: (r ?? 0) < 0 ? 'var(--color-risky)' : 'var(--color-lime)' }}>
+                    {r != null ? `${r >= 0 ? '+' : ''}${r.toFixed(2)}%` : '—'}
+                  </span>
+                  <span className="tnum text-right text-muted">{fmtUsd(p.tvl_usd)}</span>
                 </div>
-                <span className="tnum text-right font-semibold" style={{ color: (poolReturn15d(p) ?? 0) < 0 ? 'var(--color-risky)' : 'var(--color-lime)' }}>{poolReturn15d(p) != null ? `${(poolReturn15d(p) as number) >= 0 ? '+' : ''}${(poolReturn15d(p) as number).toFixed(2)}%` : '—'}</span>
-                <span className="tnum text-right text-muted">{fmtUsd(p.tvl_usd)}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
 

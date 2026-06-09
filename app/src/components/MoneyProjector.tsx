@@ -15,7 +15,7 @@ export function MoneyProjector({ netAprPct, title = 'Quanto você quer aplicar?'
             type="number"
             value={amount}
             min={0}
-            onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
+            onChange={(e) => setAmount(Math.min(1e9, Math.max(0, Number(e.target.value) || 0)))}
             className="w-28 bg-transparent py-2 pl-1 font-display tnum text-lg text-ftext outline-none"
           />
         </div>

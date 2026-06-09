@@ -7,7 +7,8 @@ export interface Projection {
 
 /** netAprPct = rendimento LÍQUIDO anual em % (ex.: 12.5). amount = quanto a pessoa aplica (US$). */
 export function projectEarnings(amount: number, netAprPct: number | null): Projection {
-  const apr = (netAprPct ?? 0) / 100;
+  if (!Number.isFinite(amount) || amount < 0) return { perDay: 0, perMonth: 0, perYear: 0 };
+  const apr = (Number.isFinite(netAprPct) ? (netAprPct as number) : 0) / 100;
   const perYear = amount * apr;
   return { perYear, perMonth: perYear / 12, perDay: perYear / 365 };
 }

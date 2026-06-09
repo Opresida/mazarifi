@@ -24,6 +24,7 @@ export function UserDashboard() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [best, setBest] = useState<Pool | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [sel, setSel] = useState<Pool | null>(null);
   const { address, isAdmin } = useWallet();
@@ -34,7 +35,7 @@ export function UserDashboard() {
         setPools(p);
         setBest(b);
       })
-      .catch(() => {})
+      .catch(() => setError('Não consegui carregar os dados agora (a fonte pode estar fora do ar). Tente recarregar.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -65,6 +66,10 @@ export function UserDashboard() {
         {best?.updated_at && <span className="text-muted-2"> · atualizado {fmtAgo(best.updated_at)}</span>}
       </p>
 
+      {error && (
+        <div className="mt-4 rounded-xl border border-rose/30 bg-rose/8 px-4 py-3 text-sm text-rose">{error}</div>
+      )}
+
       {/* Melhor opção agora */}
       <div className="mt-5 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="glow-lime relative overflow-hidden rounded-3xl border border-lime/30 bg-card/80 p-6">
@@ -83,7 +88,7 @@ export function UserDashboard() {
                 <span className="text-base font-normal text-muted-2"> nos últimos 15 dias</span>
               </p>
               <p className="mt-0.5 text-xs text-muted-2">
-                ≈ {poolAnnual(best)?.toFixed(0)}% ao ano (estimativa)
+                {poolAnnual(best) != null ? `≈ ${poolAnnual(best)!.toFixed(0)}% ao ano (estimativa)` : 'rendimento anual indisponível'}
                 {isConcentrated(best) && ' · pool concentrada (assume range ideal)'}
                 {isVolatile(best) && volBand(best) && ` · ⚠ variou de ${volBand(best)}`}
               </p>

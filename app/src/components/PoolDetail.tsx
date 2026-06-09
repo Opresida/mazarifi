@@ -91,11 +91,23 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
 
         {/* números */}
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <Metric label="TVL" value={fmtUsd(pool.tvl_usd)} />
-          <Metric label="Volume 24h" value={fmtUsd(pool.volume_usd_24h)} />
-          <Metric label="Fee tier" value={pool.fee_tier != null ? `${(pool.fee_tier * 100).toFixed(2)}%` : '—'} />
-          <Metric label="Proveniência" value={pool.provenance} />
+          <Metric label="Já aplicado aqui" value={fmtUsd(pool.tvl_usd)} />
+          {pool.exposure === 'single' ? (
+            <Metric label="Tipo" value="Empréstimo" />
+          ) : (
+            <>
+              <Metric label="Volume 24h" value={fmtUsd(pool.volume_usd_24h)} />
+              {pool.fee_tier != null && <Metric label="Taxa da troca" value={`${(pool.fee_tier * 100).toFixed(2)}%`} />}
+            </>
+          )}
+          <Metric label="Fonte do dado" value={pool.provenance} />
         </div>
+        {pool.exposure === 'single' && (
+          <p className="mt-2 text-xs leading-relaxed text-muted-2">
+            💡 Oportunidade de <b className="text-ftext">empréstimo</b>: você deposita e rende juros — não é uma pool de troca,
+            por isso não tem "volume" nem "taxa de troca".
+          </p>
+        )}
 
         {/* nota honesta de CL (Fase C pendente) */}
         {(pool.exposure === 'multi' || isNT) && (

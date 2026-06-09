@@ -17,7 +17,8 @@ app.get('/api/pools', async (_req, res) => {
       ORDER BY risk_score DESC NULLS LAST, COALESCE(net_annual_15d, apy_base, 0) DESC`;
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: String(e) });
+    console.error(e); // detalhe só no log do servidor — nunca no corpo da resposta (evita vazar a connection string)
+    res.status(500).json({ error: 'erro interno' });
   }
 });
 
@@ -33,7 +34,8 @@ app.get('/api/stats', async (_req, res) => {
       FROM pools`;
     res.json(s);
   } catch (e) {
-    res.status(500).json({ error: String(e) });
+    console.error(e); // detalhe só no log do servidor — nunca no corpo da resposta (evita vazar a connection string)
+    res.status(500).json({ error: 'erro interno' });
   }
 });
 
@@ -50,7 +52,8 @@ app.get('/api/best', async (_req, res) => {
       LIMIT 1`;
     res.json(best ?? null);
   } catch (e) {
-    res.status(500).json({ error: String(e) });
+    console.error(e); // detalhe só no log do servidor — nunca no corpo da resposta (evita vazar a connection string)
+    res.status(500).json({ error: 'erro interno' });
   }
 });
 
@@ -70,7 +73,8 @@ app.get('/api/admin/metrics', async (_req, res) => {
       FROM pools`;
     res.json({ ...agg, byChain, byRisk });
   } catch (e) {
-    res.status(500).json({ error: String(e) });
+    console.error(e); // detalhe só no log do servidor — nunca no corpo da resposta (evita vazar a connection string)
+    res.status(500).json({ error: 'erro interno' });
   }
 });
 

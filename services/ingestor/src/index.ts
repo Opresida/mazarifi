@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { and, eq, lt } from 'drizzle-orm';
 import { db } from './db/client.js';
 import { pools } from './db/schema.js';
 import { fetchBasePools } from './sources/defillama.js';
@@ -7,6 +8,7 @@ import { enrich, type EnrichedPool } from './enrich.js';
 
 async function main() {
   console.log('🔎 Ingestor Mazari Fi — puxando pools REAIS...\n');
+  const runStart = new Date();
 
   const [external, nortoken] = await Promise.all([
     fetchBasePools(30).catch((e) => {
@@ -52,6 +54,11 @@ async function main() {
     };
     const { poolKey: _k, source: _s, provenance: _p, ...upd } = row;
     await db.insert(pools).values(row).onConflictDoUpdate({ target: pools.poolKey, set: upd });
+  }
+  // Remove pools externas obsoletas (saíram do top-30 → não atualizadas nesta rodada).
+  // Só se a fonte externa veio OK (external > 0), pra não apagar tudo se o DefiLlama cair.
+  if (external.length > 0) {
+    await db.delete(pools).where(and(eq(pools.source, 'external'), lt(pools.updatedAt, runStart)));
   }
   console.log(`✅ ${all.length} pools persistidas no Neon.\n`);
 

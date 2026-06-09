@@ -23,10 +23,17 @@ interface LlamaPool {
   exposure?: string;
   stablecoin?: boolean;
   underlyingTokens?: string[] | null;
+  poolMeta?: string | null; // ex.: "0.3%" (fee tier de pools de troca)
 }
 
 function ilApplies(p: LlamaPool): boolean {
   return p.ilRisk === 'yes' && p.exposure !== 'single' && p.stablecoin !== true && (p.underlyingTokens?.length ?? 0) >= 2;
+}
+
+/** Extrai o fee tier (fração) do poolMeta do DefiLlama: "0.3%" → 0.003. null se não houver. */
+function parseFeeTier(poolMeta: string | null | undefined): number | null {
+  const m = poolMeta?.match(/([\d.]+)\s*%/);
+  return m ? parseFloat(m[1]) / 100 : null;
 }
 
 async function fetchPrices(coins: string[], timestamp?: number): Promise<Map<string, number>> {
@@ -109,9 +116,10 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
   const base = json.data.filter((p) => p.chain === 'Base' && p.tvlUsd > 0).sort((a, b) => b.tvlUsd - a.tvlUsd).slice(0, limit);
 
   // IL 15d (histórico de preço) + retorno realizado 15d (série /chart, em paralelo).
+  // .catch em cada um: se uma API externa falhar, não derruba a ingestão inteira.
   const [ilMap, charts] = await Promise.all([
-    computeImpermanentLoss(base),
-    Promise.all(base.map((p) => fetch15dReturn(p.pool))),
+    computeImpermanentLoss(base).catch(() => new Map<string, number>()),
+    Promise.all(base.map((p) => fetch15dReturn(p.pool).catch(() => null))),
   ]);
 
   return base.map((p, i) => {
@@ -134,7 +142,7 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
       apyBase: p.apyBase ?? p.apy ?? null,
       apyReward: p.apyReward ?? null,
       volumeUsd24h: p.volumeUsd1d ?? null,
-      feeTier: null,
+      feeTier: parseFeeTier(p.poolMeta),
       feeReturn15d,
       rewardReturn15d,
       ilPct15d,

@@ -1,9 +1,22 @@
-import type { Address } from 'viem';
+import { formatUnits, type Address } from 'viem';
 import { publicClient, getPoolPrice, getSwapStats, getLockPosition, poolIdFor } from '@mazarifi/chain';
 import { feeAprGross, ilFullRange } from '@mazarifi/core';
 import type { NormalizedPool } from '../types.js';
 
-const ETH_USD = 3000; // v1 constante (TODO: buscar preço real do ETH)
+/** Preço atual do ETH em USD (DefiLlama coins); fallback 3000 se a API falhar. */
+async function fetchEthUsd(): Promise<number> {
+  try {
+    const r = await fetch('https://coins.llama.fi/prices/current/coingecko:ethereum');
+    if (!r.ok) return 3000;
+    const j = (await r.json()) as { coins?: Record<string, { price?: number }> };
+    return j.coins?.['coingecko:ethereum']?.price ?? 3000;
+  } catch {
+    return 3000;
+  }
+}
+
+/** wei (18 casas) → número decimal, sem perda de precisão (formatUnits é string-based). */
+const weiToNum = (wei: bigint) => Number(formatUnits(wei, 18));
 
 /** As 3 pools v4 semeadas (createPoolAndLock + swap) — ground-truth da Mazari Fi. */
 const SEEDED = [
@@ -14,7 +27,7 @@ const SEEDED = [
 
 /** Lê as pools Nortoken on-chain: volume/fees REAIS (SwapTracked) + posição (locks). */
 export async function fetchNortokenPools(): Promise<NormalizedPool[]> {
-  const bn = await publicClient.getBlockNumber();
+  const [bn, ETH_USD] = await Promise.all([publicClient.getBlockNumber(), fetchEthUsd()]);
   const fromBlock = bn > 1900n ? bn - 1900n : 0n; // RPC público limita getLogs a 2000 blocos (TODO: paginar)
   const out: NormalizedPool[] = [];
 
@@ -27,8 +40,8 @@ export async function fetchNortokenPools(): Promise<NormalizedPool[]> {
       getLockPosition(s.lockId),
     ]);
 
-    const volumeUsd24h = (Number(stats.anchorVolumeWei) / 1e18) * ETH_USD; // REAL (ground-truth)
-    const tvlUsd = (Number(lock.principalLiquidity) / 1e18) * ETH_USD * 2; // aprox: principal nos 2 lados
+    const volumeUsd24h = weiToNum(stats.anchorVolumeWei) * ETH_USD; // REAL (ground-truth)
+    const tvlUsd = weiToNum(lock.principalLiquidity) * ETH_USD * 2; // aprox: principal nos 2 lados
 
     // fee anualizado (do volume real) → realizado em 15d; IL realizado do lançamento (1:1) ao preço atual
     const feeAprPct = tvlUsd > 0 ? feeAprGross({ volume24hUsd: volumeUsd24h, feeTier: 0.003, activeTvlUsd: tvlUsd }) * 100 : null;
