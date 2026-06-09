@@ -46,6 +46,7 @@ async function main() {
       netAnnual15d: p.netAnnual15d,
       feeReturn15d: p.feeReturn15d,
       rewardReturn15d: p.rewardReturn15d,
+      rewardSymbol: p.rewardSymbol,
       il15d: p.ilPct15d,
       volLow: p.volLow,
       volHigh: p.volHigh,

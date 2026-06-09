@@ -16,6 +16,7 @@ export interface NormalizedPool {
   // ── rendimento REALIZADO nos últimos 15 dias (% DO PERÍODO) ──
   feeReturn15d: number | null; // fee realizado em 15d
   rewardReturn15d: number | null; // incentivo realizado em 15d (TEMPORÁRIO)
+  rewardSymbol: string | null; // token(s) em que o incentivo é pago (ex.: 'AERO')
   ilPct15d: number | null; // IL realizado em 15d (0 = sem IL; null = aplicável mas não medido)
   volLow: number | null; // apyBase mínimo nos 15d (%) — volatilidade
   volHigh: number | null; // apyBase máximo nos 15d (%)

@@ -32,6 +32,7 @@ export interface Pool {
   net_annual_15d: number | null; // % anualizado (estimativa, secundário)
   fee_return_15d: number | null; // fee realizado em 15d
   reward_return_15d: number | null; // incentivo realizado em 15d (TEMPORÁRIO)
+  reward_symbol: string | null; // token do incentivo (ex.: 'AERO')
   il_15d: number | null; // % IL em 15d (0 = sem IL; null = aplicável mas não medido)
   vol_low: number | null; // apyBase mínimo nos 15d (%)
   vol_high: number | null; // apyBase máximo nos 15d (%)

@@ -23,6 +23,7 @@ interface LlamaPool {
   exposure?: string;
   stablecoin?: boolean;
   underlyingTokens?: string[] | null;
+  rewardTokens?: string[] | null; // endereços dos tokens de incentivo (ex.: AERO)
   poolMeta?: string | null; // ex.: "0.3%" (fee tier de pools de troca)
 }
 
@@ -34,6 +35,21 @@ function ilApplies(p: LlamaPool): boolean {
 function parseFeeTier(poolMeta: string | null | undefined): number | null {
   const m = poolMeta?.match(/([\d.]+)\s*%/);
   return m ? parseFloat(m[1]) / 100 : null;
+}
+
+/** Resolve endereço → símbolo (DefiLlama coins, grátis) — pra nomear o token de incentivo (ex.: AERO). */
+async function fetchSymbols(coins: string[]): Promise<Map<string, string>> {
+  const m = new Map<string, string>();
+  if (coins.length === 0) return m;
+  try {
+    const r = await fetch(`${COINS_CURRENT}${coins.join(',')}`);
+    if (!r.ok) return m;
+    const j = (await r.json()) as { coins?: Record<string, { symbol?: string }> };
+    for (const [k, v] of Object.entries(j.coins ?? {})) if (v?.symbol) m.set(k.toLowerCase(), v.symbol);
+    return m;
+  } catch {
+    return m;
+  }
 }
 
 async function fetchPrices(coins: string[], timestamp?: number): Promise<Map<string, number>> {
@@ -121,11 +137,16 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
   const seen = new Set<string>();
   const base = [...topOverall, ...topTrade].filter((p) => (seen.has(p.pool) ? false : (seen.add(p.pool), true)));
 
-  // IL 15d (histórico de preço) + retorno realizado 15d (série /chart, em paralelo).
+  // Endereços dos tokens de incentivo (pra nomear: ex.: AERO).
+  const rewardCoins = new Set<string>();
+  for (const p of base) for (const a of p.rewardTokens ?? []) rewardCoins.add(`base:${a.toLowerCase()}`);
+
+  // IL 15d (histórico) + retorno realizado 15d (/chart) + símbolos dos tokens de incentivo, em paralelo.
   // .catch em cada um: se uma API externa falhar, não derruba a ingestão inteira.
-  const [ilMap, charts] = await Promise.all([
+  const [ilMap, charts, rewardSymbols] = await Promise.all([
     computeImpermanentLoss(base).catch(() => new Map<string, number>()),
     Promise.all(base.map((p) => fetch15dReturn(p.pool).catch(() => null))),
+    fetchSymbols([...rewardCoins]).catch(() => new Map<string, string>()),
   ]);
 
   return base.map((p, i) => {
@@ -137,6 +158,8 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
     const fallbackFee = ((p.apyBase7d ?? p.apyBase) ?? null) != null ? ((p.apyBase7d ?? p.apyBase)! * WINDOW_DAYS) / 365 : null;
     const feeReturn15d = ch ? ch.feeReturn : fallbackFee;
     const rewardReturn15d = ch ? ch.rewardReturn : p.apyReward != null ? (p.apyReward * WINDOW_DAYS) / 365 : 0;
+    const rewardSymbol =
+      (p.rewardTokens ?? []).map((a) => rewardSymbols.get(`base:${a.toLowerCase()}`)).filter(Boolean).join(', ') || null;
     return {
       poolKey: `external:${p.pool}`,
       source: 'external' as const,
@@ -151,6 +174,7 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
       feeTier: parseFeeTier(p.poolMeta),
       feeReturn15d,
       rewardReturn15d,
+      rewardSymbol,
       ilPct15d,
       volLow: ch ? ch.volLow : null,
       volHigh: ch ? ch.volHigh : null,

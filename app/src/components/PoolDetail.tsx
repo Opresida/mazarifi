@@ -66,7 +66,12 @@ export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: Ne
               <div className="mt-3 space-y-1.5 text-sm">
                 <CascadeRow label="Fee (quem troca paga)" value={`+${fmtPct(pool.fee_return_15d, 2)}`} tone="pos" />
                 {pool.reward_return_15d ? (
-                  <CascadeRow label="Incentivo (emissão)" value={`+${fmtPct(pool.reward_return_15d, 2)}`} tone="pos" tag="temporário" />
+                  <CascadeRow
+                    label={`Incentivo${pool.reward_symbol ? ` (em ${pool.reward_symbol})` : ' (emissão)'}`}
+                    value={`+${fmtPct(pool.reward_return_15d, 2)}`}
+                    tone="pos"
+                    tag="temporário"
+                  />
                 ) : null}
                 <CascadeRow label="Perda impermanente" value={pool.il_15d ? `−${fmtPct(pool.il_15d, 2)}` : '0%'} tone="neg" />
                 <div className="!mt-2 border-t border-edge-soft pt-2">
@@ -98,9 +103,11 @@ export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: Ne
         {/* incentivo é "papel" — o custo mais traiçoeiro */}
         {hasReward && (
           <div className="mt-3 rounded-2xl border border-rose/30 bg-rose/8 p-4 text-xs leading-relaxed text-rose">
-            <p className="font-semibold">⚠ Cuidado: parte desse rendimento é incentivo (token de recompensa).</p>
+            <p className="font-semibold">
+              ⚠ Cuidado: parte desse rendimento é incentivo{pool.reward_symbol ? <> pago em <span className="text-ftext">{pool.reward_symbol}</span></> : ' (token de recompensa)'}.
+            </p>
             <p className="mt-1 text-rose/90">
-              Incentivo é <b>frágil</b>: pra receber de verdade você precisa <b>vender esse token</b> (mais swap + gás) e ele{' '}
+              Incentivo é <b>frágil</b>: pra receber de verdade você precisa <b>vender {pool.reward_symbol ?? 'esse token'}</b> (mais swap + gás) e ele{' '}
               <b>pode despencar</b> antes. Se a emissão secar, some.
             </p>
             <p className="mt-2 rounded-lg bg-ink/40 px-2.5 py-1.5 text-ftext">

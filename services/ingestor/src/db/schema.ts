@@ -19,6 +19,7 @@ export const pools = pgTable('pools', {
   netAnnual15d: doublePrecision('net_annual_15d'), // % anualizado (estimativa)
   feeReturn15d: doublePrecision('fee_return_15d'),
   rewardReturn15d: doublePrecision('reward_return_15d'),
+  rewardSymbol: text('reward_symbol'), // token do incentivo (ex.: 'AERO')
   il15d: doublePrecision('il_15d'),
   volLow: doublePrecision('vol_low'),
   volHigh: doublePrecision('vol_high'),
