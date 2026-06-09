@@ -20,6 +20,7 @@ export const FILTERS: FilterDef[] = [
   { id: 'concentrada', group: 'tipo', emoji: '🎯', label: 'Concentrada', help: 'Como a troca, mas turbinada: rende mais, porém é a mais complexa e arriscada.', match: (p) => poolType(p) === 'concentrada' },
   { id: 'estavel', group: 'dentro', emoji: '🪙', label: 'Moedas estáveis', help: 'Moedas que não balançam (tipo dólar). Quase sem risco de variação.', match: isStable },
   { id: 'bluechip', group: 'dentro', emoji: '💎', label: 'ETH / BTC', help: 'As cripto grandes e consolidadas.', match: isBlueChip },
+  { id: 'incentivo', group: 'dentro', emoji: '🎁', label: 'Com incentivo', help: 'Pools que pagam um bônus extra em outro token (ex.: AERO). Rende mais — confira a solidez do token no detalhe.', match: (p) => p.reward_symbol != null },
   { id: 'seguro', group: 'seguranca', emoji: '🟢', label: 'Seguro', help: 'Nível de segurança alto.', match: (p) => safetyBand(p.risk_score).label === 'Seguro' },
   { id: 'medio', group: 'seguranca', emoji: '🟡', label: 'Médio', help: 'Nível de segurança médio.', match: (p) => safetyBand(p.risk_score).label === 'Médio' },
   { id: 'arriscado', group: 'seguranca', emoji: '🔴', label: 'Arriscado', help: 'Nível de segurança baixo — cuidado.', match: (p) => safetyBand(p.risk_score).label === 'Arriscado' },
