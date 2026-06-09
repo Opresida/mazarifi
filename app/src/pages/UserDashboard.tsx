@@ -166,7 +166,7 @@ export function UserDashboard() {
         </Card>
       </div>
 
-      {sel && <PoolDetail pool={sel} onClose={() => setSel(null)} />}
+      {sel && <PoolDetail pool={sel} net={net} onClose={() => setSel(null)} />}
     </Shell>
   );
 }

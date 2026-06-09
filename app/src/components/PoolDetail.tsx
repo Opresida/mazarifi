@@ -1,12 +1,16 @@
-import type { Pool } from '../types';
-import { fmtUsd, fmtPct, riskBand } from '../lib/format';
-import { poolEntryCostPct } from '../lib/pool';
+import type { Pool, NetworkInfo } from '../types';
+import { fmtUsd, fmtUsdExact, fmtPct, fmtAgo, riskBand } from '../lib/format';
+import { poolEntryCostPct, poolGasUsd } from '../lib/pool';
 import { RiskBadge } from './RiskBadge';
 
-export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void }) {
+export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: NetworkInfo | null; onClose: () => void }) {
   const isNT = pool.source === 'nortoken';
   const hasReturn = pool.return_15d != null;
   const entryCost = poolEntryCostPct(pool);
+  const gasUsd = poolGasUsd(pool, net);
+  const gasTxt = gasUsd > 0 ? (gasUsd >= 0.01 ? fmtUsdExact(gasUsd) : `$${gasUsd.toFixed(4)}`) : '—';
+  const hasReward = pool.reward_return_15d != null && pool.reward_return_15d > 0;
+  const floor = (pool.fee_return_15d ?? 0) - (pool.il_15d ?? 0); // rendimento SEM o incentivo (fee − IL)
   const b = riskBand(pool.risk_score);
   const win = pool.window_days ?? 15;
   const ret = pool.return_15d;
@@ -91,6 +95,20 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
           )}
         </div>
 
+        {/* incentivo é "papel" — o custo mais traiçoeiro */}
+        {hasReward && (
+          <div className="mt-3 rounded-2xl border border-rose/30 bg-rose/8 p-4 text-xs leading-relaxed text-rose">
+            <p className="font-semibold">⚠ Cuidado: parte desse rendimento é incentivo (token de recompensa).</p>
+            <p className="mt-1 text-rose/90">
+              Incentivo é <b>frágil</b>: pra receber de verdade você precisa <b>vender esse token</b> (mais swap + gás) e ele{' '}
+              <b>pode despencar</b> antes. Se a emissão secar, some.
+            </p>
+            <p className="mt-2 rounded-lg bg-ink/40 px-2.5 py-1.5 text-ftext">
+              Sem o incentivo (só fee − IL), rendeu <b className="text-safe">{`${floor >= 0 ? '+' : ''}${floor.toFixed(2)}%`}</b> nesses {win} dias — esse é o piso seguro.
+            </p>
+          </div>
+        )}
+
         {/* números */}
         <div className="mt-4 grid grid-cols-2 gap-3">
           <Metric label="Já aplicado aqui" value={fmtUsd(pool.tvl_usd)} />
@@ -110,12 +128,28 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
             por isso não tem "volume" nem "taxa de troca".
           </p>
         )}
-        {entryCost > 0 && (
-          <p className="mt-3 rounded-xl border border-gold/25 bg-gold/8 p-3 text-xs leading-relaxed text-gold">
-            💸 <b>Custo de entrada ~{entryCost.toFixed(2)}%</b> (uma vez): pra montar o par você troca metade da grana e paga a
-            taxa da troca; na saída, idem. Já está calculado no projetor lá em cima ("se paga em ~N dias").
+        {/* CUSTOS — transparência total: TODO custo listado aqui */}
+        <div className="mt-4 rounded-2xl border border-gold/25 bg-gold/8 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gold">💸 Custos — transparência total</p>
+          <div className="mt-2.5 space-y-2 text-sm">
+            <CostRow label="Perda impermanente" note="já descontada do rendimento" value={pool.il_15d ? `−${fmtPct(pool.il_15d, 2)}` : '0%'} />
+            {entryCost > 0 ? (
+              <CostRow label="Swap pra montar/desmontar o par" note="uma vez, na entrada + saída" value={`~${entryCost.toFixed(2)}%`} />
+            ) : (
+              <CostRow label="Swap de entrada" note="empréstimo não tem (só deposita)" value="—" muted />
+            )}
+            <CostRow
+              label="Gás de rede"
+              note={net ? `${(net.gas_price_gwei ?? 0).toFixed(4)} gwei · ao vivo · atualizado ${fmtAgo(net.updated_at)}` : 'indisponível'}
+              value={gasTxt}
+            />
+            {entryCost > 0 && <CostRow label="Slippage (impacto no preço)" note="depende do valor — avisamos no projetor se for grande" value="variável" muted />}
+            <CostRow label="Taxa da Mazari Fi" note="Fase 1 — não movemos seu dinheiro" value="$0" muted />
+          </div>
+          <p className="mt-2.5 border-t border-gold/15 pt-2 text-[11px] leading-relaxed text-gold/80">
+            Gás é fixo em dólar (uns centavos na Base) → pesa mais em valor pequeno. O projetor já soma <b>swap + gás</b> no "se paga em ~N dias".
           </p>
-        )}
+        </div>
 
         {/* nota honesta de CL (Fase C pendente) */}
         {(pool.exposure === 'multi' || isNT) && (
@@ -146,6 +180,18 @@ function CascadeRow({ label, value, tone, tag }: { label: string; value: string;
       <span className="font-display tnum font-semibold" style={{ color }}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function CostRow({ label, value, note, muted }: { label: string; value: string; note?: string; muted?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-muted">
+        {label}
+        {note && <span className="mt-0.5 block text-[10px] leading-snug text-muted-2">{note}</span>}
+      </span>
+      <span className={`shrink-0 font-display tnum font-semibold ${muted ? 'text-muted-2' : 'text-ftext'}`}>{value}</span>
     </div>
   );
 }
