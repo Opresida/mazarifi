@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ilFullRange, concentratedAmplification, ilConcentrated, ilToUsd } from './il';
-import { feeAprGross, aprNet, aprToApy, netYield, windowReturn } from './apy';
+import { feeAprGross, aprNet, aprToApy, netYield, windowReturn, entryExitCostPct } from './apy';
 import { honestScoreboard } from './scoreboard';
 import { riskScore, riskBand, type RiskInput } from './risk';
 import { migrationAdvice } from './migration';
@@ -85,6 +85,18 @@ describe('windowReturn — "rendeu X% nos últimos N dias" (realizado)', () => {
   it('IL pode tornar o período NEGATIVO', () => {
     const w = windowReturn({ feeReturnPct: 0.5, ilPct: 2, windowDays: 15 });
     expect(w.returnPct).toBeLessThan(0);
+  });
+});
+
+describe('entryExitCostPct — custo de entrar/sair (uma vez)', () => {
+  it('empréstimo (single) não tem custo de swap', () => {
+    expect(entryExitCostPct({ feeTier: null, exposure: 'single' })).toBe(0);
+  });
+  it('pool de troca = round-trip ≈ feeTier (0,3% → 0,3)', () => {
+    expect(entryExitCostPct({ feeTier: 0.003, exposure: 'multi' })).toBeCloseTo(0.3, 9);
+  });
+  it('pool de troca sem feeTier conhecido assume 0,3%', () => {
+    expect(entryExitCostPct({ feeTier: null, exposure: 'multi' })).toBeCloseTo(0.3, 9);
   });
 });
 

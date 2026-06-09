@@ -31,6 +31,36 @@ export function volBand(p: Pool): string | null {
   return `${Math.round(p.vol_low)}% a ${Math.round(p.vol_high)}%`;
 }
 
+/** Custo de entrar+sair (% do capital, uma vez). Espelha core `entryExitCostPct`
+ *  (o app não depende de @mazarifi/core; a versão do core é a testada). Empréstimo = 0. */
+export function poolEntryCostPct(p: Pool): number {
+  if (p.exposure === 'single') return 0;
+  const fee = p.fee_tier != null && p.fee_tier > 0 ? p.fee_tier : 0.003;
+  return fee * 100;
+}
+
+// ── Filtros (linguagem leiga) ──
+export type PoolType = 'emprestimo' | 'troca' | 'concentrada';
+export function poolType(p: Pool): PoolType {
+  if (p.exposure === 'single') return 'emprestimo';
+  if (isConcentrated(p)) return 'concentrada';
+  return 'troca';
+}
+
+const STABLES = ['USDC', 'USDT', 'DAI', 'USDS', 'GHO', 'FRAX', 'PYUSD', 'USDE', 'EURC', 'USDBC', 'CRVUSD', 'LUSD', 'SUSD'];
+function symbolTokens(p: Pool): string[] {
+  return p.symbol.toUpperCase().split(/[-/ ]/).filter(Boolean);
+}
+/** Só moedas estáveis (não balançam, tipo dólar). */
+export function isStable(p: Pool): boolean {
+  const t = symbolTokens(p);
+  return t.length > 0 && t.every((s) => s.includes('USD') || STABLES.includes(s));
+}
+/** Tem ETH/BTC (cripto grande e consolidada). */
+export function isBlueChip(p: Pool): boolean {
+  return symbolTokens(p).some((s) => s.includes('ETH') || s.includes('BTC'));
+}
+
 /** Frase-porquê do "Melhor opção agora" — SÓ dados reais (sem inventar idade). */
 export function whyBest(p: Pool): string {
   const ret = p.return_15d;

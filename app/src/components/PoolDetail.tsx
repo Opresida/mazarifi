@@ -1,10 +1,12 @@
 import type { Pool } from '../types';
 import { fmtUsd, fmtPct, riskBand } from '../lib/format';
+import { poolEntryCostPct } from '../lib/pool';
 import { RiskBadge } from './RiskBadge';
 
 export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void }) {
   const isNT = pool.source === 'nortoken';
   const hasReturn = pool.return_15d != null;
+  const entryCost = poolEntryCostPct(pool);
   const b = riskBand(pool.risk_score);
   const win = pool.window_days ?? 15;
   const ret = pool.return_15d;
@@ -106,6 +108,12 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
           <p className="mt-2 text-xs leading-relaxed text-muted-2">
             💡 Oportunidade de <b className="text-ftext">empréstimo</b>: você deposita e rende juros — não é uma pool de troca,
             por isso não tem "volume" nem "taxa de troca".
+          </p>
+        )}
+        {entryCost > 0 && (
+          <p className="mt-3 rounded-xl border border-gold/25 bg-gold/8 p-3 text-xs leading-relaxed text-gold">
+            💸 <b>Custo de entrada ~{entryCost.toFixed(2)}%</b> (uma vez): pra montar o par você troca metade da grana e paga a
+            taxa da troca; na saída, idem. Já está calculado no projetor lá em cima ("se paga em ~N dias").
           </p>
         )}
 

@@ -3,8 +3,9 @@ import { Link } from 'wouter';
 import { Home, Compass, Wallet, Clock, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import type { Pool } from '../types';
 import { fetchPools, fetchBest } from '../api';
-import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand } from '../lib/pool';
+import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand, poolEntryCostPct } from '../lib/pool';
 import { fmtAgo } from '../lib/format';
+import { Filters, applyFilters } from '../components/Filters';
 import { Shell, type NavItem } from '../components/Shell';
 import { Card, RiskPill, SectionTitle } from '../components/atoms';
 import { OpportunityCard } from '../components/OpportunityCard';
@@ -26,8 +27,16 @@ export function UserDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [filters, setFilters] = useState<Set<string>>(new Set());
   const [sel, setSel] = useState<Pool | null>(null);
   const { address, isAdmin } = useWallet();
+
+  const toggleFilter = (id: string) =>
+    setFilters((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   useEffect(() => {
     Promise.all([fetchPools(), fetchBest()])
@@ -40,11 +49,12 @@ export function UserDashboard() {
   }, []);
 
   const list = useMemo(() => {
-    return pools
+    const base = pools
       .filter((p) => poolReturn15d(p) != null)
       .filter((p) => (q ? p.symbol.toLowerCase().includes(q.toLowerCase()) || p.project.toLowerCase().includes(q.toLowerCase()) : true))
       .sort((a, b) => (poolAnnual(b) ?? 0) - (poolAnnual(a) ?? 0));
-  }, [pools, q]);
+    return applyFilters(base, filters);
+  }, [pools, q, filters]);
 
   return (
     <Shell
@@ -106,7 +116,11 @@ export function UserDashboard() {
         </div>
 
         {/* Projetor de ganho (na melhor opção) */}
-        <MoneyProjector netAprPct={best ? poolAnnual(best) : null} title="Quanto você quer aplicar na melhor opção?" />
+        <MoneyProjector
+          netAprPct={best ? poolAnnual(best) : null}
+          entryCostPct={best ? poolEntryCostPct(best) : 0}
+          title="Quanto você quer aplicar na melhor opção?"
+        />
       </div>
 
       {/* Lista de oportunidades */}
@@ -123,10 +137,15 @@ export function UserDashboard() {
         >
           Todas as oportunidades
         </SectionTitle>
+        <div className="mt-3">
+          <Filters active={filters} onToggle={toggleFilter} onClear={() => setFilters(new Set())} />
+        </div>
         {loading ? (
           <p className="py-10 text-center text-sm text-muted-2">Carregando…</p>
+        ) : list.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-2">Nenhuma oportunidade com esses filtros. Tente afrouxar.</p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {list.map((p, i) => (
               <OpportunityCard key={p.pool_key} pool={p} rank={i + 1} onOpen={() => setSel(p)} />
             ))}

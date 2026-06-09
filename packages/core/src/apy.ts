@@ -111,3 +111,18 @@ export function windowReturn(i: WindowReturnInput): WindowReturn {
   const returnPct = (i.feeReturnPct || 0) + (i.rewardReturnPct || 0) - Math.max(0, i.ilPct || 0) - Math.max(0, i.costPct || 0);
   return { returnPct, annualizedPct: (returnPct * 365) / win, windowDays: win };
 }
+
+/**
+ * Custo ESTIMADO de entrar+sair de uma oportunidade, em % do capital (uma vez).
+ * - Empréstimo (`single`): ~0 — você só deposita 1 moeda, sem swap.
+ * - Pool de troca (`multi`): ≈ `feeTier` — pra montar o par você troca ~metade (paga 0,5×fee na entrada)
+ *   e desmonta na saída (mais 0,5×fee) ⇒ round-trip ≈ feeTier. Sem feeTier conhecido, assume 0,3%.
+ * Não inclui gás (desprezível na Base) nem slippage. É o custo que o headline "rendeu X% em 15d" (histórico)
+ * NÃO desconta — entra só na DECISÃO de entrar agora.
+ * Golden: single→0; multi feeTier 0,003 → 0,3%.
+ */
+export function entryExitCostPct(i: { feeTier: number | null; exposure: string | null }): number {
+  if (i.exposure === 'single') return 0;
+  const fee = i.feeTier != null && i.feeTier > 0 ? i.feeTier : 0.003;
+  return fee * 100;
+}
