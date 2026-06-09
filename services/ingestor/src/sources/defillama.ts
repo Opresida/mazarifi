@@ -113,7 +113,13 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
   if (!res.ok) throw new Error(`DefiLlama HTTP ${res.status}`);
   const json = (await res.json()) as { data: LlamaPool[] };
 
-  const base = json.data.filter((p) => p.chain === 'Base' && p.tvlUsd > 0).sort((a, b) => b.tvlUsd - a.tvlUsd).slice(0, limit);
+  // Dois baldes pra garantir cobertura: o topo de TVL na Base é dominado por EMPRÉSTIMO (lending),
+  // então pegamos também as melhores pools de TROCA (AMM = exposure 'multi') separadamente.
+  const all = json.data.filter((p) => p.chain === 'Base' && p.tvlUsd > 0).sort((a, b) => b.tvlUsd - a.tvlUsd);
+  const topOverall = all.slice(0, limit); // top por TVL (lending + o que vier)
+  const topTrade = all.filter((p) => p.exposure === 'multi').slice(0, 25); // garante pools de troca/concentradas
+  const seen = new Set<string>();
+  const base = [...topOverall, ...topTrade].filter((p) => (seen.has(p.pool) ? false : (seen.add(p.pool), true)));
 
   // IL 15d (histórico de preço) + retorno realizado 15d (série /chart, em paralelo).
   // .catch em cada um: se uma API externa falhar, não derruba a ingestão inteira.

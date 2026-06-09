@@ -11,7 +11,7 @@ async function main() {
   const runStart = new Date();
 
   const [external, nortoken] = await Promise.all([
-    fetchBasePools(30).catch((e) => {
+    fetchBasePools(40).catch((e) => {
       console.error('DefiLlama falhou:', e.message);
       return [];
     }),

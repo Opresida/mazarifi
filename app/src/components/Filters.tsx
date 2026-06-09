@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { HelpCircle, X } from 'lucide-react';
+import { HelpCircle, SlidersHorizontal, X } from 'lucide-react';
 import type { Pool } from '../types';
 import { poolType, isStable, isBlueChip } from '../lib/pool';
 import { safetyBand } from '../lib/format';
 
-type Group = 'tipo' | 'dentro' | 'seguranca';
+type Group = 'tipo' | 'dentro' | 'seguranca' | 'origem';
 interface FilterDef {
   id: string;
   group: Group;
@@ -23,10 +23,12 @@ export const FILTERS: FilterDef[] = [
   { id: 'seguro', group: 'seguranca', emoji: '🟢', label: 'Seguro', help: 'Nível de segurança alto.', match: (p) => safetyBand(p.risk_score).label === 'Seguro' },
   { id: 'medio', group: 'seguranca', emoji: '🟡', label: 'Médio', help: 'Nível de segurança médio.', match: (p) => safetyBand(p.risk_score).label === 'Médio' },
   { id: 'arriscado', group: 'seguranca', emoji: '🔴', label: 'Arriscado', help: 'Nível de segurança baixo — cuidado.', match: (p) => safetyBand(p.risk_score).label === 'Arriscado' },
+  { id: 'nortoken', group: 'origem', emoji: '⬢', label: 'Nortoken', help: 'Pools criadas na nossa plataforma, medidas direto na blockchain — nossa vantagem injusta.', match: (p) => p.source === 'nortoken' },
+  { id: 'mercado', group: 'origem', emoji: '🌐', label: 'Mercado', help: 'Pools do mercado aberto (Aave, Uniswap, Aerodrome…), trazidas do DefiLlama.', match: (p) => p.source === 'external' },
 ];
 
-const GROUP_TITLE: Record<Group, string> = { tipo: 'Como funciona', dentro: 'O que tem dentro', seguranca: 'Segurança' };
-const GROUPS: Group[] = ['tipo', 'dentro', 'seguranca'];
+const GROUP_TITLE: Record<Group, string> = { tipo: 'Como funciona', dentro: 'O que tem dentro', seguranca: 'Segurança', origem: 'Origem' };
+const GROUPS: Group[] = ['tipo', 'dentro', 'seguranca', 'origem'];
 
 /** Filtra as pools: AND entre grupos, OR dentro do grupo. */
 export function applyFilters(pools: Pool[], active: Set<string>): Pool[] {
@@ -38,27 +40,51 @@ export function applyFilters(pools: Pool[], active: Set<string>): Pool[] {
   return pools.filter((p) => [...byGroup.values()].every((defs) => defs.some((d) => d.match(p))));
 }
 
-export function Filters({ active, onToggle, onClear }: { active: Set<string>; onToggle: (id: string) => void; onClear: () => void }) {
+export function Filters({
+  active,
+  onToggle,
+  onClear,
+  count,
+}: {
+  active: Set<string>;
+  onToggle: (id: string) => void;
+  onClear: () => void;
+  count: number;
+}) {
   const [help, setHelp] = useState(false);
   return (
-    <div className="rounded-2xl border border-edge bg-card/60 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <button onClick={() => setHelp((h) => !h)} className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ftext">
-          <HelpCircle size={13} /> {help ? 'Ocultar explicações' : 'O que é cada filtro?'}
-        </button>
-        {active.size > 0 && (
-          <button onClick={onClear} className="inline-flex items-center gap-1 text-xs text-muted-2 hover:text-rose">
-            <X size={12} /> Limpar
+    <div className="rounded-2xl border border-edge bg-gradient-to-b from-card/80 to-card/40 p-3 sm:p-4">
+      {/* header */}
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ftext">
+            <SlidersHorizontal size={15} className="text-lime" /> Filtros
+          </span>
+          <span className="rounded-full bg-ink px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted">{count} {count === 1 ? 'opção' : 'opções'}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setHelp((h) => !h)}
+            className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition-colors ${help ? 'bg-iris/15 text-iris-bright' : 'text-muted hover:text-ftext'}`}
+          >
+            <HelpCircle size={13} /> {help ? 'Ocultar' : 'O que é?'}
           </button>
-        )}
+          {active.size > 0 && (
+            <button onClick={onClear} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-2 transition-colors hover:bg-rose/10 hover:text-rose">
+              <X size={12} /> Limpar
+            </button>
+          )}
+        </div>
       </div>
-      <div className="flex flex-col gap-2.5">
+
+      {/* grupos */}
+      <div className="flex flex-col gap-3">
         {GROUPS.map((g) => {
           const defs = FILTERS.filter((f) => f.group === g);
           return (
             <div key={g}>
-              <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-2">{GROUP_TITLE[g]}</p>
-              <div className="flex flex-wrap gap-1.5">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-2">{GROUP_TITLE[g]}</p>
+              <div className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
                 {defs.map((f) => {
                   const on = active.has(f.id);
                   return (
@@ -66,17 +92,22 @@ export function Filters({ active, onToggle, onClear }: { active: Set<string>; on
                       key={f.id}
                       onClick={() => onToggle(f.id)}
                       title={f.help}
-                      className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${on ? 'border-lime/50 bg-lime/12 text-lime' : 'border-edge text-muted hover:text-ftext'}`}
+                      className={`group shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-150 active:scale-95 ${
+                        on
+                          ? 'border-lime/60 bg-lime/15 text-lime shadow-[0_0_18px_rgba(52,226,155,0.20)]'
+                          : 'border-edge bg-ink/50 text-muted hover:border-lime/30 hover:text-ftext'
+                      }`}
                     >
-                      {f.emoji} {f.label}
+                      <span className="text-sm leading-none">{f.emoji}</span>
+                      {f.label}
                     </button>
                   );
                 })}
               </div>
               {help && (
-                <ul className="mt-1 space-y-0.5">
+                <ul className="mt-1.5 space-y-1 rounded-xl bg-ink/40 p-2.5">
                   {defs.map((f) => (
-                    <li key={f.id} className="text-[10px] leading-relaxed text-muted-2">
+                    <li key={f.id} className="text-[11px] leading-relaxed text-muted-2">
                       <span className="text-muted">{f.emoji} {f.label}:</span> {f.help}
                     </li>
                   ))}

@@ -138,7 +138,7 @@ export function UserDashboard() {
           Todas as oportunidades
         </SectionTitle>
         <div className="mt-3">
-          <Filters active={filters} onToggle={toggleFilter} onClear={() => setFilters(new Set())} />
+          <Filters active={filters} onToggle={toggleFilter} onClear={() => setFilters(new Set())} count={list.length} />
         </div>
         {loading ? (
           <p className="py-10 text-center text-sm text-muted-2">Carregando…</p>
