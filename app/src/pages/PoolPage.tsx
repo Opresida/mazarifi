@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useRoute } from 'wouter';
-import { Home, Compass, Wallet, Clock, ArrowLeft, ExternalLink, CheckCircle2, AlertTriangle, MinusCircle, ArrowRight } from 'lucide-react';
+import { Compass, Wallet, ArrowLeft, ExternalLink, CheckCircle2, AlertTriangle, MinusCircle, ArrowRight } from 'lucide-react';
 import type { Pool, NetworkInfo } from '../types';
 import { fetchPool, fetchPools, fetchNetwork } from '../api';
 import { Shell, type NavItem } from '../components/Shell';
@@ -14,10 +14,8 @@ import { poolAnnual, poolName, poolEntryCostPct, poolGasUsd } from '../lib/pool'
 import { fmtUsdExact } from '../lib/format';
 
 const NAV: NavItem[] = [
-  { path: '/dashboard', label: 'Início', icon: Home },
   { path: '/dashboard', label: 'Oportunidades', icon: Compass },
-  { path: '/dashboard', label: 'Minha aplicação', icon: Wallet },
-  { path: '/dashboard', label: 'Histórico', icon: Clock },
+  { path: '/minhas-aplicacoes', label: 'Minha aplicação', icon: Wallet },
 ];
 
 const PROTOCOL_URL: Record<string, string> = {

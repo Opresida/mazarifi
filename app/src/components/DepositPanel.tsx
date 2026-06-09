@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Link } from 'wouter';
+import { Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { Pool, NetworkInfo } from '../types';
 import { useWallet, switchToBase, sendTx } from '../lib/wallet';
 import { quoteZap, usdcAllowance, approveUsdc, type ZapQuote } from '../lib/zap';
@@ -73,8 +74,11 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | nul
       <Card className="glow-lime border-lime/30 p-4">
         <p className="flex items-center gap-2 text-sm font-semibold text-lime"><CheckCircle2 size={16} /> Depósito enviado!</p>
         <p className="mt-1 text-xs leading-relaxed text-muted">Sua transação foi assinada e enviada. A posição entra assim que confirmar na rede.</p>
+        <Link href="/minhas-aplicacoes" className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-semibold text-ink hover:bg-lime-bright">
+          Acompanhar minhas aplicações <ArrowRight size={15} />
+        </Link>
         {txHash && (
-          <a href={`https://basescan.org/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-lime hover:text-lime-bright">
+          <a href={`https://basescan.org/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ftext">
             Ver no BaseScan <ExternalLink size={13} />
           </a>
         )}

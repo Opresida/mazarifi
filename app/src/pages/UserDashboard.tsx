@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Home, Compass, Wallet, ArrowRight, Landmark, Repeat } from 'lucide-react';
+import { Compass, Wallet, ArrowRight, Landmark, Repeat } from 'lucide-react';
 import type { Pool, BestPicks, NetworkInfo } from '../types';
 import { fetchPools, fetchBest, fetchNetwork } from '../api';
 import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand, poolEntryCostPct, poolGasUsd } from '../lib/pool';
@@ -10,14 +10,12 @@ import { Shell, type NavItem } from '../components/Shell';
 import { RiskPill, SectionTitle } from '../components/atoms';
 import { OpportunityCard } from '../components/OpportunityCard';
 import { MoneyProjector } from '../components/MoneyProjector';
-import { PositionsSection } from '../components/PositionsSection';
 import { WalletButton } from '../components/WalletButton';
 import { useWallet } from '../lib/wallet';
 
 const NAV: NavItem[] = [
-  { anchor: 'topo', label: 'Início', icon: Home },
-  { anchor: 'oportunidades', label: 'Oportunidades', icon: Compass },
-  { anchor: 'minha-aplicacao', label: 'Minha aplicação', icon: Wallet },
+  { path: '/dashboard', label: 'Oportunidades', icon: Compass },
+  { path: '/minhas-aplicacoes', label: 'Minha aplicação', icon: Wallet },
 ];
 
 export function UserDashboard() {
@@ -149,14 +147,19 @@ export function UserDashboard() {
         )}
       </div>
 
-      {/* Minha aplicação — posições reais + sacar */}
-      <div id="minha-aplicacao" className="mt-8 scroll-mt-20">
-        <SectionTitle>Minha aplicação</SectionTitle>
-        <div className="mt-3">
-          <PositionsSection net={net} />
-        </div>
+      {/* CTA pra ver as posições (a aplicação vive na rota própria /minhas-aplicacoes) */}
+      <div className="mt-8">
+        <Link
+          href="/minhas-aplicacoes"
+          className="flex items-center justify-between rounded-2xl border border-edge bg-card/60 p-4 transition-colors hover:border-lime/30"
+        >
+          <div>
+            <p className="font-display font-semibold text-ftext">Minhas aplicações</p>
+            <p className="text-xs text-muted-2">Veja o que você já aplicou e saque quando quiser.</p>
+          </div>
+          <ArrowRight size={18} className="text-muted-2" />
+        </Link>
       </div>
-
     </Shell>
   );
 }
