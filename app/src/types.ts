@@ -1,3 +1,9 @@
+/** Os dois destaques: melhor empréstimo e melhor pool de troca. */
+export interface BestPicks {
+  lending: Pool | null;
+  trade: Pool | null;
+}
+
 export interface Pool {
   pool_key: string;
   source: 'nortoken' | 'external';

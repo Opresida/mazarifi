@@ -39,18 +39,25 @@ app.get('/api/stats', async (_req, res) => {
   }
 });
 
-/** Melhor opção AGORA: melhor rendimento (base 15d) entre as seguras, PREFERINDO baixa volatilidade
- *  (pool que oscilou pouco). Não destaca spike de pool volátil. */
+/** Melhores opções AGORA — DOIS destaques (empréstimo vs pool de troca), ambos:
+ *  rendimento real >0, razoavelmente seguros, PREFERINDO baixa volatilidade (não destaca spike),
+ *  e com TVL mínimo (não destaca pool testnet de TVL irrisória como "melhor pra aplicar"). */
+const MIN_TVL = 50000;
 app.get('/api/best', async (_req, res) => {
   try {
-    const [best] = await sql`
+    const [lending] = await sql`
       SELECT * FROM pools
       WHERE return_15d IS NOT NULL AND return_15d > 0 AND risk_score >= 65
-      ORDER BY
-        (CASE WHEN vol_low > 0 AND vol_high <= vol_low * 3 THEN 0 ELSE 1 END),
-        net_annual_15d DESC
+        AND exposure = 'single' AND COALESCE(tvl_usd, 0) >= ${MIN_TVL}
+      ORDER BY (CASE WHEN vol_low > 0 AND vol_high <= vol_low * 3 THEN 0 ELSE 1 END), net_annual_15d DESC
       LIMIT 1`;
-    res.json(best ?? null);
+    const [trade] = await sql`
+      SELECT * FROM pools
+      WHERE return_15d IS NOT NULL AND return_15d > 0 AND risk_score >= 60
+        AND exposure = 'multi' AND COALESCE(tvl_usd, 0) >= ${MIN_TVL}
+      ORDER BY (CASE WHEN vol_low > 0 AND vol_high <= vol_low * 3 THEN 0 ELSE 1 END), net_annual_15d DESC
+      LIMIT 1`;
+    res.json({ lending: lending ?? null, trade: trade ?? null });
   } catch (e) {
     console.error(e); // detalhe só no log do servidor — nunca no corpo da resposta (evita vazar a connection string)
     res.status(500).json({ error: 'erro interno' });
