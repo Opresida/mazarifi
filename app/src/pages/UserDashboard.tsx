@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Home, Compass, Wallet, Clock, ArrowRight, ShieldCheck, Landmark, Repeat } from 'lucide-react';
+import { Home, Compass, Wallet, Clock, ArrowRight, Landmark, Repeat } from 'lucide-react';
 import type { Pool, BestPicks, NetworkInfo } from '../types';
 import { fetchPools, fetchBest, fetchNetwork } from '../api';
 import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand, poolEntryCostPct, poolGasUsd } from '../lib/pool';
 import { fmtAgo } from '../lib/format';
 import { Filters, applyFilters } from '../components/Filters';
 import { Shell, type NavItem } from '../components/Shell';
-import { Card, RiskPill, SectionTitle } from '../components/atoms';
+import { RiskPill, SectionTitle } from '../components/atoms';
 import { OpportunityCard } from '../components/OpportunityCard';
 import { MoneyProjector } from '../components/MoneyProjector';
+import { PositionsSection } from '../components/PositionsSection';
 import { WalletButton } from '../components/WalletButton';
 import { useWallet } from '../lib/wallet';
 
@@ -149,21 +150,12 @@ export function UserDashboard() {
         )}
       </div>
 
-      {/* Minha aplicação (empty-state honesto) */}
+      {/* Minha aplicação — posições reais + sacar */}
       <div className="mt-8">
         <SectionTitle>Minha aplicação</SectionTitle>
-        <Card className="flex flex-col items-center gap-2 p-8 text-center">
-          <ShieldCheck size={24} className="text-muted-2" />
-          <p className="text-sm text-muted">
-            {address ? 'Você ainda não aplicou em nenhuma oportunidade.' : 'Conecte sua carteira para acompanhar suas aplicações aqui.'}
-          </p>
-          {!address && (
-            <div className="mt-1">
-              <WalletButton />
-            </div>
-          )}
-          <p className="text-[11px] text-muted-2">Aplicar pela Mazari Fi (1 clique) chega na próxima fase.</p>
-        </Card>
+        <div className="mt-3">
+          <PositionsSection net={net} />
+        </div>
       </div>
 
     </Shell>

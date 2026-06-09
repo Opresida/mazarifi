@@ -18,6 +18,18 @@ export interface RewardIntegrity {
   reasons: string[];
 }
 
+/** Posição DeFi do usuário (LP/vault que ele tem na carteira). */
+export interface Position {
+  token: string;
+  symbol: string | null;
+  name: string | null;
+  valueUsd: number;
+  amount: string; // base units
+  decimals: number;
+  protocol: string | null;
+  logoUri: string | null;
+}
+
 /** Gás AO VIVO da Base + preço do ETH (custo de gás por tipo de operação, em US$). */
 export interface NetworkInfo {
   gas_price_gwei: number | null;

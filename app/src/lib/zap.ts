@@ -43,3 +43,40 @@ export async function usdcAllowance(owner: string, spender: string): Promise<big
 export async function approveUsdc(spender: string): Promise<string> {
   return sendTx({ to: USDC_BASE, data: encodeApprove(spender, MAX_UINT) });
 }
+
+/** Allowance de um token qualquer (pro saque: aprovar a posição pro router). */
+export async function tokenAllowance(owner: string, spender: string, token: string): Promise<bigint> {
+  try {
+    const r = await fetch(`/api/zap/allowance?owner=${owner}&spender=${spender}&token=${token}`);
+    if (!r.ok) return 0n;
+    const j = (await r.json()) as { allowance?: string };
+    return BigInt(j.allowance && j.allowance !== '0x' ? j.allowance : '0x0');
+  } catch {
+    return 0n;
+  }
+}
+
+/** Aprova um token qualquer pro spender. */
+export async function approveToken(token: string, spender: string): Promise<string> {
+  return sendTx({ to: token, data: encodeApprove(spender, MAX_UINT) });
+}
+
+export interface WithdrawQuote {
+  supported: boolean;
+  reason?: string;
+  to?: string;
+  data?: string;
+  value?: string;
+  spender?: string;
+  amountOut?: string; // USDC base units (6)
+  gas?: string;
+  priceImpact?: number;
+}
+
+/** Saque: monta a tx "posição → USDC" (Enso). */
+export async function quoteWithdraw(token: string, amount: string, fromAddress: string, slippageBps = 50): Promise<WithdrawQuote> {
+  const q = new URLSearchParams({ token, amount, fromAddress, slippageBps: String(slippageBps) });
+  const r = await fetch(`/api/zap/withdraw?${q.toString()}`);
+  if (!r.ok) return { supported: false, reason: `erro ${r.status}` };
+  return r.json();
+}

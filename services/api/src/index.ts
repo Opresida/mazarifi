@@ -92,21 +92,76 @@ const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const BASE_RPC = process.env.BASE_RPC || 'https://mainnet.base.org';
 const ensoHeaders = () => ({ Authorization: `Bearer ${process.env.ENSO_API_KEY}` });
 
-/** Lê allowance de USDC (server-side, RPC confiável — evita a RPC instável da carteira no browser). */
+/** Lê allowance de um ERC20 (server-side, RPC confiável — evita a RPC instável da carteira). token=USDC por padrão. */
 app.get('/api/zap/allowance', async (req, res) => {
   try {
     const owner = String(req.query.owner ?? '');
     const spender = String(req.query.spender ?? '');
+    const token = /^0x[0-9a-fA-F]{40}$/.test(String(req.query.token ?? '')) ? String(req.query.token) : USDC_BASE;
     if (!/^0x[0-9a-fA-F]{40}$/.test(owner) || !/^0x[0-9a-fA-F]{40}$/.test(spender)) return res.status(400).json({ error: 'endereço inválido' });
     const pad = (h: string) => h.replace(/^0x/, '').toLowerCase().padStart(64, '0');
     const data = '0xdd62ed3e' + pad(owner) + pad(spender); // allowance(owner,spender)
     const r = await fetch(BASE_RPC, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: USDC_BASE, data }, 'latest'] }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: token, data }, 'latest'] }),
     });
     const j = (await r.json()) as { result?: string };
     res.json({ allowance: j.result ?? '0x0' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
+/** "Minhas posições": lê a carteira (Enso) e filtra as POSIÇÕES DeFi (LP/vault) com valor. */
+app.get('/api/positions', async (req, res) => {
+  try {
+    if (!process.env.ENSO_API_KEY) return res.json({ positions: [] });
+    const address = String(req.query.address ?? '');
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return res.status(400).json({ error: 'endereço inválido' });
+    const br = await fetch(`${ENSO}/wallet/balances?chainId=8453&eoaAddress=${address}&useEoa=true`, { headers: ensoHeaders() });
+    if (!br.ok) return res.json({ positions: [] });
+    const balances = (await br.json()) as Array<{ token: string; amount: string; decimals: number; price: number; symbol?: string; name?: string; logoUri?: string }>;
+    const candidates = balances
+      .map((b) => ({ ...b, valueUsd: (Number(b.amount) / 10 ** b.decimals) * (b.price || 0) }))
+      .filter((b) => b.valueUsd >= 1 && b.token.toLowerCase() !== USDC_BASE.toLowerCase())
+      .sort((a, b) => b.valueUsd - a.valueUsd)
+      .slice(0, 15);
+    const checked = await Promise.all(
+      candidates.map(async (b) => {
+        try {
+          const mr = await fetch(`${ENSO}/tokens?chainId=8453&address=${b.token}`, { headers: ensoHeaders() });
+          const mj = (await mr.json()) as { data?: Array<{ type?: string; protocolSlug?: string }> };
+          const meta = mj.data?.[0];
+          if (!meta || !(meta.type === 'defi' || meta.protocolSlug)) return null;
+          return { token: b.token, symbol: b.symbol ?? null, name: b.name ?? null, valueUsd: b.valueUsd, amount: b.amount, decimals: b.decimals, protocol: meta.protocolSlug ?? null, logoUri: b.logoUri ?? null };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    res.json({ positions: checked.filter(Boolean) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
+/** SAQUE (zap-out): monta a tx "posição → USDC" pro usuário ASSINAR (não-custodial). */
+app.get('/api/zap/withdraw', async (req, res) => {
+  try {
+    if (process.env.ZAP_ENABLED !== 'true' || !process.env.ENSO_API_KEY) return res.json({ supported: false, reason: 'zap desativado' });
+    const token = String(req.query.token ?? '');
+    const amount = String(req.query.amount ?? '');
+    const fromAddress = String(req.query.fromAddress ?? '');
+    const slippageBps = Number(req.query.slippageBps) || 50;
+    if (!/^0x[0-9a-fA-F]{40}$/.test(token) || !amount || !fromAddress) return res.status(400).json({ error: 'parâmetros faltando' });
+    const rq = new URLSearchParams({ chainId: '8453', fromAddress, receiver: fromAddress, amountIn: amount, tokenIn: token, tokenOut: USDC_BASE, routingStrategy: 'router', slippage: String(slippageBps) });
+    const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
+    if (!rr.ok) return res.json({ supported: false, reason: `Enso route ${rr.status}` });
+    const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
+    res.json({ supported: true, to: d.tx?.to, data: d.tx?.data, value: d.tx?.value ?? '0', spender: d.tx?.to, amountOut: d.amountOut, gas: d.gas, priceImpact: d.priceImpact ?? 0 });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });
