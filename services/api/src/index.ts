@@ -85,6 +85,81 @@ app.get('/api/admin/metrics', async (_req, res) => {
   }
 });
 
+/** ZAP não-custodial via Enso: monta a tx "USDC → posição da pool" pro usuário ASSINAR (fundos nunca passam pela Mazari).
+ *  A chave Enso fica SÓ aqui no servidor. ZAP_ENABLED=off → desativa (kill-switch). */
+const ENSO = 'https://api.enso.finance/api/v1';
+const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const ensoHeaders = () => ({ Authorization: `Bearer ${process.env.ENSO_API_KEY}` });
+
+function ensoSlug(project: string): string | null {
+  const p = project.toLowerCase();
+  if (p.includes('aerodrome')) return 'aerodrome';
+  if (p.includes('uniswap-v3') || p.includes('uniswap-v4')) return 'uniswap-v3';
+  if (p.includes('morpho')) return 'morpho-blue-vaults';
+  if (p.includes('curve')) return 'curve-dex';
+  if (p.includes('balancer')) return 'balancer-v2';
+  if (p.includes('uniswap-v2') || p.includes('sushiswap')) return 'uniswap-v2';
+  return null;
+}
+
+app.get('/api/zap/quote', async (req, res) => {
+  try {
+    if (process.env.ZAP_ENABLED !== 'true' || !process.env.ENSO_API_KEY) return res.json({ supported: false, reason: 'zap desativado' });
+    const poolKey = String(req.query.poolKey ?? '');
+    const amountUsdc = Number(req.query.amountUsdc ?? 0);
+    const fromAddress = String(req.query.fromAddress ?? '');
+    const slippageBps = Number(req.query.slippageBps) || 50;
+    if (!poolKey || !(amountUsdc > 0) || !fromAddress) return res.status(400).json({ error: 'parâmetros faltando' });
+
+    const [pool] = await sql`SELECT project, raw FROM pools WHERE pool_key = ${poolKey} LIMIT 1`;
+    if (!pool) return res.json({ supported: false, reason: 'pool não encontrada' });
+    const slug = ensoSlug(pool.project);
+    const underlying: string[] = (pool.raw?.underlyingTokens ?? []) as string[];
+    if (!slug || underlying.length === 0) return res.json({ supported: false, reason: 'protocolo sem zap' });
+
+    // resolve a posição (LP/vault) alvo no Enso pelos tokens do par
+    const tq = new URLSearchParams({ chainId: '8453', protocolSlug: slug, page: '1' });
+    for (const u of underlying) tq.append('underlyingTokens', u);
+    const tr = await fetch(`${ENSO}/tokens?${tq.toString()}`, { headers: ensoHeaders() });
+    const tj = (await tr.json()) as { data?: Array<{ address: string; symbol?: string | null }> };
+    const lp = tj.data?.[0];
+    if (!lp?.address) return res.json({ supported: false, reason: 'posição não encontrada no Enso' });
+
+    const amountIn = BigInt(Math.floor(amountUsdc * 1e6)).toString(); // USDC = 6 casas
+    const rq = new URLSearchParams({
+      chainId: '8453',
+      fromAddress,
+      receiver: fromAddress,
+      amountIn,
+      tokenIn: USDC_BASE,
+      tokenOut: lp.address,
+      routingStrategy: 'router',
+      slippage: String(slippageBps),
+    });
+    const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
+    if (!rr.ok) return res.json({ supported: false, reason: `Enso route ${rr.status}` });
+    const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
+
+    res.json({
+      supported: true,
+      lpTarget: lp.address,
+      lpSymbol: lp.symbol ?? null,
+      tokenIn: USDC_BASE,
+      amountIn,
+      to: d.tx?.to,
+      data: d.tx?.data,
+      value: d.tx?.value ?? '0',
+      spender: d.tx?.to, // approve do USDC vai pro router do Enso
+      amountOut: d.amountOut,
+      gas: d.gas,
+      priceImpact: d.priceImpact ?? 0,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
 /** Uma pool específica (página do ativo). key = pool_key (ex.: external:0x...). */
 app.get('/api/pool/:key', async (req, res) => {
   try {

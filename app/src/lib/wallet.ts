@@ -17,6 +17,31 @@ declare global {
   }
 }
 
+const BASE_CHAIN_HEX = '0x2105'; // Base mainnet (8453)
+
+/** Garante que a carteira está na Base (pede troca de rede se preciso). */
+export async function switchToBase(): Promise<void> {
+  if (!window.ethereum) throw new Error('Sem carteira');
+  const cid = (await window.ethereum.request({ method: 'eth_chainId' })) as string;
+  if (cid?.toLowerCase() === BASE_CHAIN_HEX) return;
+  await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_HEX }] });
+}
+
+/** Leitura on-chain (eth_call) — read-only. */
+export async function ethCall(to: string, data: string): Promise<string> {
+  if (!window.ethereum) throw new Error('Sem carteira');
+  return (await window.ethereum.request({ method: 'eth_call', params: [{ to, data }, 'latest'] })) as string;
+}
+
+/** Envia 1 transação pra carteira ASSINAR (não-custodial). Retorna o hash. */
+export async function sendTx(tx: { to: string; data: string; value?: string }): Promise<string> {
+  if (!window.ethereum) throw new Error('Sem carteira');
+  const from = localStorage.getItem('mz_addr');
+  if (!from) throw new Error('Conecte a carteira');
+  const value = tx.value && tx.value !== '0' ? '0x' + BigInt(tx.value).toString(16) : '0x0';
+  return (await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from, to: tx.to, data: tx.data, value }] })) as string;
+}
+
 /** Connect injetado (MetaMask/Rabby...) — sem custódia, sem libs pesadas. */
 export function useWallet() {
   const [address, setAddress] = useState<string | null>(() =>

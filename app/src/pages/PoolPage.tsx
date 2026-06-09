@@ -6,6 +6,7 @@ import { fetchPool, fetchPools, fetchNetwork } from '../api';
 import { Shell, type NavItem } from '../components/Shell';
 import { Card } from '../components/atoms';
 import { PoolDetailContent } from '../components/PoolDetail';
+import { DepositPanel } from '../components/DepositPanel';
 import { WalletButton } from '../components/WalletButton';
 import { buildChecklist, type CheckItem } from '../lib/checklist';
 import { bestAlternative, migrationAdvice } from '../lib/migration';
@@ -79,6 +80,7 @@ export function PoolPage() {
               <ChecklistCard pool={pool} />
             </div>
             <div className="space-y-4">
+              {pool.source !== 'nortoken' && <DepositPanel pool={pool} net={net} />}
               <HowToEnterCard pool={pool} />
               <MigrationCard pool={pool} all={all} net={net} />
             </div>
@@ -126,8 +128,8 @@ function HowToEnterCard({ pool }: { pool: Pool }) {
   const url = protocolUrl(pool.project);
   const isNT = pool.source === 'nortoken';
   return (
-    <Card className="glow-lime border-lime/30 p-4">
-      <p className="text-sm font-semibold text-ftext">Como entrar</p>
+    <Card className="p-4">
+      <p className="text-sm font-semibold text-ftext">Prefere entrar manualmente?</p>
       {isNT ? (
         <p className="mt-2 text-xs leading-relaxed text-muted">Pool Nortoken (testnet/demo) — entrada pela Mazari Fi chega na próxima fase.</p>
       ) : (
@@ -142,14 +144,11 @@ function HowToEnterCard({ pool }: { pool: Pool }) {
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-semibold text-ink hover:bg-lime-bright"
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-edge px-4 py-2 text-sm font-semibold text-ftext hover:border-lime/30"
             >
               Abrir {pool.project} <ExternalLink size={15} />
             </a>
           )}
-          <p className="mt-3 rounded-lg bg-iris/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-iris-bright">
-            🔜 Em breve: deposite 1 token aqui e a gente monta a pool pra você — sem custódia (você assina da sua carteira).
-          </p>
         </>
       )}
     </Card>
