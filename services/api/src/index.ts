@@ -85,5 +85,16 @@ app.get('/api/admin/metrics', async (_req, res) => {
   }
 });
 
+/** Estado da rede: gás AO VIVO da Base + preço do ETH (1 linha). */
+app.get('/api/network', async (_req, res) => {
+  try {
+    const [n] = await sql`SELECT * FROM network WHERE id = 1`;
+    res.json(n ?? null);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
 const PORT = Number(process.env.PORT) || 3001;
 app.listen(PORT, () => console.log(`[mazari-fi api] http://localhost:${PORT}`));

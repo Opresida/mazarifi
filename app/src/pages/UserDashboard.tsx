@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { Home, Compass, Wallet, Clock, ArrowRight, ShieldCheck, Landmark, Repeat } from 'lucide-react';
-import type { Pool, BestPicks } from '../types';
-import { fetchPools, fetchBest } from '../api';
-import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand, poolEntryCostPct } from '../lib/pool';
+import type { Pool, BestPicks, NetworkInfo } from '../types';
+import { fetchPools, fetchBest, fetchNetwork } from '../api';
+import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand, poolEntryCostPct, poolGasUsd } from '../lib/pool';
 import { fmtAgo } from '../lib/format';
 import { Filters, applyFilters } from '../components/Filters';
 import { Shell, type NavItem } from '../components/Shell';
@@ -24,6 +24,7 @@ const NAV: NavItem[] = [
 export function UserDashboard() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [best, setBest] = useState<BestPicks | null>(null);
+  const [net, setNet] = useState<NetworkInfo | null>(null);
   const [projKind, setProjKind] = useState<'lending' | 'trade'>('lending');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,10 +41,11 @@ export function UserDashboard() {
     });
 
   useEffect(() => {
-    Promise.all([fetchPools(), fetchBest()])
-      .then(([p, b]) => {
+    Promise.all([fetchPools(), fetchBest(), fetchNetwork().catch(() => null)])
+      .then(([p, b, n]) => {
         setPools(p);
         setBest(b);
+        setNet(n);
       })
       .catch(() => setError('Não consegui carregar os dados agora (a fonte pode estar fora do ar). Tente recarregar.'))
       .finally(() => setLoading(false));
@@ -109,6 +111,8 @@ export function UserDashboard() {
             <MoneyProjector
               netAprPct={projPool ? poolAnnual(projPool) : null}
               entryCostPct={projPool ? poolEntryCostPct(projPool) : 0}
+              gasUsd={projPool ? poolGasUsd(projPool, net) : 0}
+              tvlUsd={projPool?.tvl_usd ?? null}
               title={`Quanto você quer aplicar ${projKind === 'lending' ? 'no empréstimo' : 'na pool de troca'}?`}
             />
           </div>

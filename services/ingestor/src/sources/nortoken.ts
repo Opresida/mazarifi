@@ -1,19 +1,8 @@
 import { formatUnits, type Address } from 'viem';
 import { publicClient, getPoolPrice, getSwapStats, getLockPosition, poolIdFor } from '@mazarifi/chain';
 import { feeAprGross, ilFullRange } from '@mazarifi/core';
+import { fetchEthUsd } from '../prices.js';
 import type { NormalizedPool } from '../types.js';
-
-/** Preço atual do ETH em USD (DefiLlama coins); fallback 3000 se a API falhar. */
-async function fetchEthUsd(): Promise<number> {
-  try {
-    const r = await fetch('https://coins.llama.fi/prices/current/coingecko:ethereum');
-    if (!r.ok) return 3000;
-    const j = (await r.json()) as { coins?: Record<string, { price?: number }> };
-    return j.coins?.['coingecko:ethereum']?.price ?? 3000;
-  } catch {
-    return 3000;
-  }
-}
 
 /** wei (18 casas) → número decimal, sem perda de precisão (formatUnits é string-based). */
 const weiToNum = (wei: bigint) => Number(formatUnits(wei, 18));

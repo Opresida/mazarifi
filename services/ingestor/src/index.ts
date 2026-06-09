@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import { and, eq, lt } from 'drizzle-orm';
+import { getBaseGasPriceWei } from '@mazarifi/chain';
+import { gasCostUsd, OP_GAS } from '@mazarifi/core';
 import { db } from './db/client.js';
-import { pools } from './db/schema.js';
+import { pools, network } from './db/schema.js';
 import { fetchBasePools } from './sources/defillama.js';
 import { fetchNortokenPools } from './sources/nortoken.js';
+import { fetchEthUsd } from './prices.js';
 import { enrich, type EnrichedPool } from './enrich.js';
 
 async function main() {
@@ -61,6 +64,27 @@ async function main() {
     await db.delete(pools).where(and(eq(pools.source, 'external'), lt(pools.updatedAt, runStart)));
   }
   console.log(`✅ ${all.length} pools persistidas no Neon.\n`);
+
+  // Gás de rede AO VIVO (Base mainnet, grátis) → custo de gás por tipo de operação.
+  try {
+    const [gasPriceWei, ethUsd] = await Promise.all([getBaseGasPriceWei(), fetchEthUsd()]);
+    const gasRow = {
+      id: 1,
+      gasPriceGwei: Number(gasPriceWei) / 1e9,
+      ethUsd,
+      gasLendingUsd: gasCostUsd({ gasUnits: OP_GAS.emprestimo, gasPriceWei, ethUsd }),
+      gasTradeUsd: gasCostUsd({ gasUnits: OP_GAS.troca, gasPriceWei, ethUsd }),
+      gasConcentratedUsd: gasCostUsd({ gasUnits: OP_GAS.concentrada, gasPriceWei, ethUsd }),
+      updatedAt: new Date(),
+    };
+    const { id: _id, ...gasUpd } = gasRow;
+    await db.insert(network).values(gasRow).onConflictDoUpdate({ target: network.id, set: gasUpd });
+    console.log(
+      `⛽ gás Base ${gasRow.gasPriceGwei.toFixed(4)} gwei (ETH $${ethUsd.toFixed(0)}) → empréstimo $${gasRow.gasLendingUsd.toFixed(3)} · troca $${gasRow.gasTradeUsd.toFixed(3)} · concentrada $${gasRow.gasConcentratedUsd.toFixed(3)}\n`,
+    );
+  } catch (e) {
+    console.error('gás Base falhou:', (e as Error).message);
+  }
 
   // RANKING — CEGO À ORIGEM: risco, depois rendimento anualizado (base 15d). `source` NÃO interfere.
   const netOf = (p: EnrichedPool) => p.netAnnual15d ?? p.apyBase ?? 0;

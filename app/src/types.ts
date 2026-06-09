@@ -4,6 +4,16 @@ export interface BestPicks {
   trade: Pool | null;
 }
 
+/** Gás AO VIVO da Base + preço do ETH (custo de gás por tipo de operação, em US$). */
+export interface NetworkInfo {
+  gas_price_gwei: number | null;
+  eth_usd: number | null;
+  gas_lending_usd: number | null;
+  gas_trade_usd: number | null;
+  gas_concentrated_usd: number | null;
+  updated_at: string;
+}
+
 export interface Pool {
   pool_key: string;
   source: 'nortoken' | 'external';

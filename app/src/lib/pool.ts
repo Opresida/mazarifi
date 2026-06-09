@@ -1,4 +1,4 @@
-import type { Pool } from '../types';
+import type { Pool, NetworkInfo } from '../types';
 import { fmtUsd, safetyBand } from './format';
 
 /** Rendimento anualizado a usar no ranking/projetor (base 15d; senão o reportado). */
@@ -37,6 +37,14 @@ export function poolEntryCostPct(p: Pool): number {
   if (p.exposure === 'single') return 0;
   const fee = p.fee_tier != null && p.fee_tier > 0 ? p.fee_tier : 0.003;
   return fee * 100;
+}
+
+/** Gás de rede (US$, ao vivo) da operação típica desta pool, conforme o tipo. */
+export function poolGasUsd(p: Pool, net: NetworkInfo | null): number {
+  if (!net) return 0;
+  const t = poolType(p);
+  const v = t === 'emprestimo' ? net.gas_lending_usd : t === 'concentrada' ? net.gas_concentrated_usd : net.gas_trade_usd;
+  return v ?? 0;
 }
 
 // ── Filtros (linguagem leiga) ──

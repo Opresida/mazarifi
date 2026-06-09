@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ilFullRange, concentratedAmplification, ilConcentrated, ilToUsd } from './il';
 import { feeAprGross, aprNet, aprToApy, netYield, windowReturn, entryExitCostPct } from './apy';
+import { gasCostUsd, priceImpactPct, OP_GAS } from './gas';
 import { honestScoreboard } from './scoreboard';
 import { riskScore, riskBand, type RiskInput } from './risk';
 import { migrationAdvice } from './migration';
@@ -97,6 +98,29 @@ describe('entryExitCostPct — custo de entrar/sair (uma vez)', () => {
   });
   it('pool de troca sem feeTier conhecido assume 0,3%', () => {
     expect(entryExitCostPct({ feeTier: null, exposure: 'multi' })).toBeCloseTo(0.3, 9);
+  });
+});
+
+describe('gasCostUsd — gás ao vivo em USD', () => {
+  it('200k units, 1 gwei, ETH $2000 → $0,40', () => {
+    expect(gasCostUsd({ gasUnits: 200_000, gasPriceWei: 1_000_000_000n, ethUsd: 2000 })).toBeCloseTo(0.4, 9);
+  });
+  it('Base barata: 250k (lending), 0,01 gwei, ETH $1640 → centavos', () => {
+    const c = gasCostUsd({ gasUnits: OP_GAS.emprestimo, gasPriceWei: 10_000_000n, ethUsd: 1640 });
+    expect(c).toBeGreaterThan(0);
+    expect(c).toBeLessThan(0.01);
+  });
+});
+
+describe('priceImpactPct — slippage estimado do swap de entrada', () => {
+  it('$10k numa pool de $1M → 0,5%', () => {
+    expect(priceImpactPct({ amountUsd: 10_000, tvlUsd: 1_000_000 })).toBeCloseTo(0.5, 9);
+  });
+  it('valor pequeno em pool grande → ~0%', () => {
+    expect(priceImpactPct({ amountUsd: 100, tvlUsd: 30_000_000 })).toBeLessThan(0.001);
+  });
+  it('sem TVL → 0 (não inventa)', () => {
+    expect(priceImpactPct({ amountUsd: 1000, tvlUsd: null })).toBe(0);
   });
 });
 

@@ -42,3 +42,14 @@ export const pools = pgTable('pools', {
   raw: jsonb('raw'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Estado da rede (1 linha, id=1): gás AO VIVO da Base + preço do ETH → custo de gás por tipo de op. */
+export const network = pgTable('network', {
+  id: integer('id').primaryKey(), // sempre 1
+  gasPriceGwei: doublePrecision('gas_price_gwei'),
+  ethUsd: doublePrecision('eth_usd'),
+  gasLendingUsd: doublePrecision('gas_lending_usd'),
+  gasTradeUsd: doublePrecision('gas_trade_usd'),
+  gasConcentratedUsd: doublePrecision('gas_concentrated_usd'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

@@ -1,18 +1,26 @@
 import { useState } from 'react';
-import { projectEarnings } from '../lib/money';
-import { fmtUsdExact } from '../lib/format';
+import { projectEarnings, priceImpactPct } from '../lib/money';
+import { fmtUsd, fmtUsdExact } from '../lib/format';
 
 export function MoneyProjector({
   netAprPct,
   entryCostPct = 0,
+  gasUsd = 0,
+  tvlUsd = null,
   title = 'Quanto você quer aplicar?',
 }: {
   netAprPct: number | null;
   entryCostPct?: number;
+  gasUsd?: number;
+  tvlUsd?: number | null;
   title?: string;
 }) {
   const [amount, setAmount] = useState(1000);
-  const p = projectEarnings(amount, netAprPct, entryCostPct);
+  const p = projectEarnings(amount, netAprPct, entryCostPct, gasUsd);
+  const isTrade = entryCostPct > 0;
+  const slippage = isTrade ? priceImpactPct(amount, tvlUsd) : 0;
+  const breakEven = p.breakEvenDays != null ? Math.ceil(p.breakEvenDays) : null;
+
   return (
     <div className="rounded-2xl border border-edge bg-card/70 p-4">
       <label className="text-sm font-medium text-ftext">{title}</label>
@@ -42,18 +50,32 @@ export function MoneyProjector({
         <Proj label="Por mês" v={p.perMonth} />
         <Proj label="Por ano" v={p.perYear} />
       </div>
-      {p.entryCost > 0 ? (
-        <div className="mt-3 rounded-xl border border-gold/25 bg-gold/8 px-3 py-2 text-[11px] leading-relaxed text-gold">
-          Custo de entrada ~{fmtUsdExact(p.entryCost)} (uma vez, pra montar a posição).{' '}
-          {p.breakEvenDays != null ? (
-            <>Se paga em ~<strong>{Math.ceil(p.breakEvenDays)} dia{Math.ceil(p.breakEvenDays) > 1 ? 's' : ''}</strong> — depois disso é lucro.</>
-          ) : (
-            <>O rendimento atual é baixo demais pra cobrir esse custo rápido.</>
-          )}
-        </div>
-      ) : (
-        <p className="mt-3 text-[11px] text-safe">✓ Sem custo de entrada — é um empréstimo, você só deposita.</p>
+
+      {/* Custo de entrada: swap + gás (ao vivo) + break-even */}
+      <div className="mt-3 rounded-xl border border-gold/25 bg-gold/8 px-3 py-2 text-[11px] leading-relaxed text-gold">
+        {p.entryCost > 0 ? (
+          <>
+            <span className="font-semibold">Custo de entrada ~{fmtUsdExact(p.entryCost)}</span> (uma vez):{' '}
+            {p.swapCost > 0 ? `swap ${fmtUsdExact(p.swapCost)} + ` : 'só o '}gás {fmtUsdExact(p.gasCost)}{' '}
+            <span className="text-gold/70">(ao vivo)</span>.{' '}
+            {breakEven != null ? (
+              <>Se paga em ~<strong>{breakEven} dia{breakEven > 1 ? 's' : ''}</strong> — depois é lucro.</>
+            ) : (
+              <>O rendimento atual não cobre esse custo rápido.</>
+            )}
+          </>
+        ) : (
+          <>✓ Praticamente sem custo de entrada.</>
+        )}
+      </div>
+
+      {/* Slippage: aviso quando o valor é grande pra pool */}
+      {isTrade && slippage > 0.1 && (
+        <p className="mt-2 rounded-xl border border-rose/25 bg-rose/8 px-3 py-2 text-[11px] leading-relaxed text-rose">
+          ⚠ Impacto no preço ~{slippage.toFixed(2)}% na entrada/saída — seu valor é grande pra essa pool (TVL {fmtUsd(tvlUsd)}). Considere dividir.
+        </p>
       )}
+
       <p className="mt-2 text-[11px] leading-relaxed text-muted-2">
         Estimativa dos últimos 15 dias, já tirando as perdas. Rende mais ou menos — <strong className="text-muted">não é garantia</strong>.
       </p>

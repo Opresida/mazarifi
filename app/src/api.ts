@@ -1,4 +1,4 @@
-import type { Pool, Stats, AdminMetrics, BestPicks } from './types';
+import type { Pool, Stats, AdminMetrics, BestPicks, NetworkInfo } from './types';
 
 export async function fetchPools(): Promise<Pool[]> {
   const r = await fetch('/api/pools');
@@ -15,6 +15,12 @@ export async function fetchStats(): Promise<Stats> {
 export async function fetchBest(): Promise<BestPicks> {
   const r = await fetch('/api/best');
   if (!r.ok) throw new Error(`API /best ${r.status}`);
+  return r.json();
+}
+
+export async function fetchNetwork(): Promise<NetworkInfo | null> {
+  const r = await fetch('/api/network');
+  if (!r.ok) throw new Error(`API /network ${r.status}`);
   return r.json();
 }
 
