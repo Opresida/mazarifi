@@ -134,9 +134,7 @@ export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: Ne
                 <p className="mt-2 rounded-lg bg-ink/40 px-2.5 py-1.5 text-ftext">
                   Sem o incentivo (só fee − IL), rendeu <b className="text-safe">{`${floor >= 0 ? '+' : ''}${floor.toFixed(2)}%`}</b> nesses {win} dias — o piso seguro.
                 </p>
-                {ri && ri.verified == null && (
-                  <p className="mt-1.5 text-[10px] text-muted-2">Idade e contrato verificado entram com a chave Etherscan (grátis). Auditoria: confira no site do projeto.</p>
-                )}
+                <p className="mt-1.5 text-[10px] text-muted-2">Auditoria não é verificável on-chain — confira no site do projeto.</p>
               </div>
             );
           })()}
