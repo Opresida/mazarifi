@@ -89,7 +89,29 @@ app.get('/api/admin/metrics', async (_req, res) => {
  *  A chave Enso fica SÓ aqui no servidor. ZAP_ENABLED=off → desativa (kill-switch). */
 const ENSO = 'https://api.enso.finance/api/v1';
 const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const BASE_RPC = process.env.BASE_RPC || 'https://mainnet.base.org';
 const ensoHeaders = () => ({ Authorization: `Bearer ${process.env.ENSO_API_KEY}` });
+
+/** Lê allowance de USDC (server-side, RPC confiável — evita a RPC instável da carteira no browser). */
+app.get('/api/zap/allowance', async (req, res) => {
+  try {
+    const owner = String(req.query.owner ?? '');
+    const spender = String(req.query.spender ?? '');
+    if (!/^0x[0-9a-fA-F]{40}$/.test(owner) || !/^0x[0-9a-fA-F]{40}$/.test(spender)) return res.status(400).json({ error: 'endereço inválido' });
+    const pad = (h: string) => h.replace(/^0x/, '').toLowerCase().padStart(64, '0');
+    const data = '0xdd62ed3e' + pad(owner) + pad(spender); // allowance(owner,spender)
+    const r = await fetch(BASE_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: USDC_BASE, data }, 'latest'] }),
+    });
+    const j = (await r.json()) as { result?: string };
+    res.json({ allowance: j.result ?? '0x0' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
 
 function ensoSlug(project: string): string | null {
   const p = project.toLowerCase();

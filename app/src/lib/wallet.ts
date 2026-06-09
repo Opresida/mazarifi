@@ -19,12 +19,21 @@ declare global {
 
 const BASE_CHAIN_HEX = '0x2105'; // Base mainnet (8453)
 
-/** Garante que a carteira está na Base (pede troca de rede se preciso). */
+/** Garante que a carteira está na Base (troca/adiciona a rede se preciso). */
 export async function switchToBase(): Promise<void> {
   if (!window.ethereum) throw new Error('Sem carteira');
   const cid = (await window.ethereum.request({ method: 'eth_chainId' })) as string;
   if (cid?.toLowerCase() === BASE_CHAIN_HEX) return;
-  await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_HEX }] });
+  try {
+    await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_HEX }] });
+  } catch (e) {
+    if ((e as { code?: number })?.code === 4902) {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{ chainId: BASE_CHAIN_HEX, chainName: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: ['https://mainnet.base.org'], blockExplorerUrls: ['https://basescan.org'] }],
+      });
+    } else throw e;
+  }
 }
 
 /** Leitura on-chain (eth_call) — read-only. */

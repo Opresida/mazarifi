@@ -1,5 +1,5 @@
-import { ethCall, sendTx } from './wallet';
-import { encodeAllowance, encodeApprove, MAX_UINT } from './erc20';
+import { sendTx } from './wallet';
+import { encodeApprove, MAX_UINT } from './erc20';
 
 export const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
@@ -27,10 +27,16 @@ export async function quoteZap(poolKey: string, amountUsdc: number, fromAddress:
   return r.json();
 }
 
-/** Allowance atual de USDC pro spender (router Enso). */
+/** Allowance atual de USDC pro spender — lido pelo NOSSO servidor (RPC confiável, sem a RPC instável da carteira). */
 export async function usdcAllowance(owner: string, spender: string): Promise<bigint> {
-  const res = await ethCall(USDC_BASE, encodeAllowance(owner, spender));
-  return BigInt(res && res !== '0x' ? res : '0x0');
+  try {
+    const r = await fetch(`/api/zap/allowance?owner=${owner}&spender=${spender}`);
+    if (!r.ok) return 0n;
+    const j = (await r.json()) as { allowance?: string };
+    return BigInt(j.allowance && j.allowance !== '0x' ? j.allowance : '0x0');
+  } catch {
+    return 0n; // se não der pra ler, assume 0 → faz o approve (seguro)
+  }
 }
 
 /** Aprova USDC pro spender (uma vez). Retorna o hash. */
