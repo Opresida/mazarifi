@@ -2,9 +2,10 @@ import { ilFullRange } from '@mazarifi/core';
 import type { NormalizedPool } from '../types.js';
 
 const DEFILLAMA_POOLS = 'https://yields.llama.fi/pools';
+const DEFILLAMA_CHART = 'https://yields.llama.fi/chart/';
 const COINS_CURRENT = 'https://coins.llama.fi/prices/current/';
 const COINS_HIST = 'https://coins.llama.fi/prices/historical/';
-const IL_WINDOW_DAYS = 7;
+const WINDOW_DAYS = 15;
 
 interface LlamaPool {
   pool: string;
@@ -13,16 +14,13 @@ interface LlamaPool {
   symbol: string;
   tvlUsd: number;
   apyBase: number | null;
-  apyBase7d?: number | null; // fee anualizado, janela 7d (mais honesto que 1d)
+  apyBase7d?: number | null;
   apyReward: number | null;
-  apyMean30d?: number | null; // média 30d (pra faixa)
   apy: number | null;
-  il7d?: number | null; // IL realizado em 7d (%)
   volumeUsd1d?: number | null;
-  volumeUsd7d?: number | null;
-  sigma?: number | null; // volatilidade do APY (proxy de estabilidade)
-  ilRisk?: string; // 'yes' | 'no'
-  exposure?: string; // 'single' | 'multi'
+  sigma?: number | null;
+  ilRisk?: string;
+  exposure?: string;
   stablecoin?: boolean;
   underlyingTokens?: string[] | null;
 }
@@ -31,7 +29,6 @@ function ilApplies(p: LlamaPool): boolean {
   return p.ilRisk === 'yes' && p.exposure !== 'single' && p.stablecoin !== true && (p.underlyingTokens?.length ?? 0) >= 2;
 }
 
-/** Preços (USD) de uma lista de tokens Base via DefiLlama coins (atual ou histórico). */
 async function fetchPrices(coins: string[], timestamp?: number): Promise<Map<string, number>> {
   const m = new Map<string, number>();
   if (coins.length === 0) return m;
@@ -43,7 +40,7 @@ async function fetchPrices(coins: string[], timestamp?: number): Promise<Map<str
   return m;
 }
 
-/** IL REAL (%) por pool: do histórico de preço dos 2 ativos numa janela de 7d. Map poolId→il%. */
+/** IL REAL (%) por pool: histórico de preço dos 2 ativos numa janela de 15d. */
 async function computeImpermanentLoss(base: LlamaPool[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   const ilPools = base.filter(ilApplies);
@@ -53,42 +50,79 @@ async function computeImpermanentLoss(base: LlamaPool[]): Promise<Map<string, nu
   if (coins.length === 0) return out;
 
   const now = Math.floor(Date.now() / 1000);
-  const then = now - IL_WINDOW_DAYS * 86400;
+  const then = now - WINDOW_DAYS * 86400;
   const [pn, pt] = await Promise.all([fetchPrices(coins), fetchPrices(coins, then)]);
 
   for (const p of ilPools) {
     const [t0, t1] = p.underlyingTokens!.slice(0, 2).map((t) => `base:${t.toLowerCase()}`);
     const p0n = pn.get(t0), p1n = pn.get(t1), p0t = pt.get(t0), p1t = pt.get(t1);
     if (p0n && p1n && p0t && p1t && p0t > 0 && p1t > 0) {
-      const r = p0n / p1n / (p0t / p1t); // variação relativa do par na janela
+      const r = p0n / p1n / (p0t / p1t);
       if (r > 0) out.set(p.pool, Math.abs(ilFullRange(r)) * 100);
     }
   }
   return out;
 }
 
-// projetos com auditoria reconhecida (proxy honesto — TODO: base de auditorias real)
+interface ChartPoint {
+  apyBase?: number | null;
+  apyReward?: number | null;
+}
+interface Realized15d {
+  feeReturn: number; // % fee realizado nos 15d
+  rewardReturn: number; // % incentivo realizado nos 15d
+  volLow: number; // apyBase mínimo (%)
+  volHigh: number; // apyBase máximo (%)
+}
+
+/** Retorno REALIZADO nos últimos 15 dias, somando o fee diário (apyBase/365) da série do DefiLlama. */
+async function fetch15dReturn(poolId: string): Promise<Realized15d | null> {
+  try {
+    const r = await fetch(`${DEFILLAMA_CHART}${poolId}`);
+    if (!r.ok) return null;
+    const j = (await r.json()) as { data?: ChartPoint[] };
+    const data = (j.data ?? []).slice(-WINDOW_DAYS);
+    if (data.length === 0) return null;
+    let feeReturn = 0;
+    let rewardReturn = 0;
+    const bases: number[] = [];
+    for (const d of data) {
+      const b = d.apyBase ?? 0;
+      feeReturn += b / 365;
+      rewardReturn += (d.apyReward ?? 0) / 365;
+      bases.push(b);
+    }
+    return { feeReturn, rewardReturn, volLow: Math.min(...bases), volHigh: Math.max(...bases) };
+  } catch {
+    return null;
+  }
+}
+
 const AUDITED = ['uniswap', 'aerodrome', 'curve', 'balancer', 'compound', 'aave', 'morpho', 'pendle'];
 
-/** Puxa pools REAIS da Base no DefiLlama (grátis, sem chave). apyBase = referência (não recalc). */
+/** Puxa pools REAIS da Base + IL 15d + retorno REALIZADO 15d (do /chart). */
 export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
   const res = await fetch(DEFILLAMA_POOLS);
   if (!res.ok) throw new Error(`DefiLlama HTTP ${res.status}`);
   const json = (await res.json()) as { data: LlamaPool[] };
 
-  const base = json.data
-    .filter((p) => p.chain === 'Base' && p.tvlUsd > 0)
-    .sort((a, b) => b.tvlUsd - a.tvlUsd)
-    .slice(0, limit);
+  const base = json.data.filter((p) => p.chain === 'Base' && p.tvlUsd > 0).sort((a, b) => b.tvlUsd - a.tvlUsd).slice(0, limit);
 
-  // IL real (histórico de preço) pras pools que têm risco de IL; 0 pras single/stable.
-  const ilMap = await computeImpermanentLoss(base);
+  // IL 15d (histórico de preço) + retorno realizado 15d (série /chart, em paralelo).
+  const [ilMap, charts] = await Promise.all([
+    computeImpermanentLoss(base),
+    Promise.all(base.map((p) => fetch15dReturn(p.pool))),
+  ]);
 
-  return base.map((p) => {
+  return base.map((p, i) => {
     const project = p.project.toLowerCase();
     const tvlStability = p.sigma != null ? Math.max(0, Math.min(1, 1 - p.sigma)) : 0.6;
-    // ilPct: 0 se IL não se aplica; valor calculado se temos preço; null se aplica mas não deu (→ net não é forjado).
-    const ilPct = ilApplies(p) ? (ilMap.get(p.pool) ?? null) : 0;
+    const ilPct15d = ilApplies(p) ? (ilMap.get(p.pool) ?? null) : 0;
+    const ch = charts[i];
+    // fee/reward realizados em 15d: do /chart; fallback = apyBase7d × 15/365.
+    const fallbackFee = ((p.apyBase7d ?? p.apyBase) ?? null) != null ? ((p.apyBase7d ?? p.apyBase)! * WINDOW_DAYS) / 365 : null;
+    const feeReturn15d = ch ? ch.feeReturn : fallbackFee;
+    const rewardReturn15d = ch ? ch.rewardReturn : p.apyReward != null ? (p.apyReward * WINDOW_DAYS) / 365 : 0;
     return {
       poolKey: `external:${p.pool}`,
       source: 'external' as const,
@@ -101,13 +135,12 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
       apyReward: p.apyReward ?? null,
       volumeUsd24h: p.volumeUsd1d ?? null,
       feeTier: null,
-      // FEE só do componente de fee (apyBase7d/apyBase). NUNCA cai pro `apy` total
-      // (isso double-contava o incentivo). Pool movida a emissão (apyBase null) ⇒ fee 0.
-      feeAprPct: (p.apyBase7d ?? p.apyBase) ?? (p.apyReward != null ? 0 : null),
-      rewardAprPct: p.apyReward ?? null,
-      ilPct,
-      windowDays: 7,
-      apyMean30d: p.apyMean30d ?? null,
+      feeReturn15d,
+      rewardReturn15d,
+      ilPct15d,
+      volLow: ch ? ch.volLow : null,
+      volHigh: ch ? ch.volHigh : null,
+      windowDays: WINDOW_DAYS,
       exposure: p.exposure ?? null,
       ilRisk: p.ilRisk ?? null,
       contractAgeDays: 365,

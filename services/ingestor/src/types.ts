@@ -1,6 +1,6 @@
 import type { PoolSource } from '@mazarifi/core';
 
-/** Pool normalizada (qualquer fonte) + as dimensões de risco pro core. */
+/** Pool normalizada (qualquer fonte) + dimensões de risco + rendimento REALIZADO em 15 dias. */
 export interface NormalizedPool {
   poolKey: string;
   source: PoolSource; // 'nortoken' | 'external' — METADATA, nunca ordena
@@ -12,21 +12,22 @@ export interface NormalizedPool {
   apyBase: number | null; // % reportado (referência)
   apyReward: number | null;
   volumeUsd24h: number | null;
-  feeTier: number | null; // fração (0.003 = 0,3%)
-  // ── insumos do rendimento LÍQUIDO de IL (janela real) ──
-  feeAprPct: number | null; // fee anualizado (%) — janela real
-  rewardAprPct: number | null; // incentivo anualizado (%) — TEMPORÁRIO
-  ilPct: number | null; // perda impermanente (%) NA janela (0 = sem IL)
-  windowDays: number; // janela da fee/IL realizadas
-  apyMean30d: number | null; // fee média 30d (pra montar a faixa)
+  feeTier: number | null;
+  // ── rendimento REALIZADO nos últimos 15 dias (% DO PERÍODO) ──
+  feeReturn15d: number | null; // fee realizado em 15d
+  rewardReturn15d: number | null; // incentivo realizado em 15d (TEMPORÁRIO)
+  ilPct15d: number | null; // IL realizado em 15d (0 = sem IL; null = aplicável mas não medido)
+  volLow: number | null; // apyBase mínimo nos 15d (%) — volatilidade
+  volHigh: number | null; // apyBase máximo nos 15d (%)
+  windowDays: number; // 15
   exposure: string | null; // 'single' | 'multi'
   ilRisk: string | null; // 'yes' | 'no'
-  // dimensões de risco (mesmas p/ todas as fontes → régua única)
+  // dimensões de risco (mesmas p/ todas as fontes)
   contractAgeDays: number;
   audited: boolean;
-  tvlStability: number; // 0..1
+  tvlStability: number;
   liquidityUsd: number;
-  trustScore?: number; // 0..100
+  trustScore?: number;
   sellable: boolean;
   raw: unknown;
 }

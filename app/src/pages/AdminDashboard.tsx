@@ -3,8 +3,8 @@ import { Redirect } from 'wouter';
 import { LayoutDashboard, Boxes, Users, BarChart3, LifeBuoy, Settings, RefreshCw, AlertTriangle, Droplet } from 'lucide-react';
 import type { Pool, AdminMetrics } from '../types';
 import { fetchPools, fetchAdminMetrics } from '../api';
-import { poolNet, poolName } from '../lib/pool';
-import { fmtUsd, fmtPct } from '../lib/format';
+import { poolReturn15d, poolAnnual, poolName } from '../lib/pool';
+import { fmtUsd } from '../lib/format';
 import { Shell, type NavItem } from '../components/Shell';
 import { Card, StatCard, Donut, RiskMeter, ActivityItem, DemoDot, SectionTitle, Sparkline, demoSeries, RiskPill } from '../components/atoms';
 import { WalletButton } from '../components/WalletButton';
@@ -40,7 +40,7 @@ export function AdminDashboard() {
   if (!address) return <ConnectGate />;
   if (!isAdmin) return <Redirect to="/dashboard" />;
 
-  const top = [...pools].filter((p) => poolNet(p) != null).sort((a, b) => (poolNet(b) ?? 0) - (poolNet(a) ?? 0)).slice(0, 6);
+  const top = [...pools].filter((p) => poolReturn15d(p) != null).sort((a, b) => (poolAnnual(b) ?? 0) - (poolAnnual(a) ?? 0)).slice(0, 6);
   const chainData = (m?.byChain ?? []).slice(0, 5).map((c, i) => ({ name: c.chain, value: c.tvl || c.pools, color: CHAIN_COLORS[i % CHAIN_COLORS.length] }));
 
   return (
@@ -72,7 +72,7 @@ export function AdminDashboard() {
           <SectionTitle>Melhores oportunidades <span className="ml-1 text-[10px] font-normal text-lime">· real</span></SectionTitle>
           <div className="overflow-hidden">
             <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 border-b border-edge-soft pb-2 text-[10px] uppercase tracking-wide text-muted-2">
-              <span>#</span><span>Oportunidade</span><span className="text-right">Líquido</span><span className="text-right">Aplicado</span>
+              <span>#</span><span>Oportunidade</span><span className="text-right">Rendeu 15d</span><span className="text-right">Aplicado</span>
             </div>
             {top.map((p, i) => (
               <div key={p.pool_key} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b border-edge-soft/60 py-2.5 text-sm last:border-0">
@@ -81,7 +81,7 @@ export function AdminDashboard() {
                   <p className="truncate font-medium text-ftext">{poolName(p)}</p>
                   <p className="truncate text-[11px] text-muted-2">{p.project} · {p.chain}</p>
                 </div>
-                <span className="tnum text-right font-semibold" style={{ color: (poolNet(p) ?? 0) < 0 ? 'var(--color-risky)' : 'var(--color-lime)' }}>{fmtPct(poolNet(p), 1)}</span>
+                <span className="tnum text-right font-semibold" style={{ color: (poolReturn15d(p) ?? 0) < 0 ? 'var(--color-risky)' : 'var(--color-lime)' }}>{poolReturn15d(p) != null ? `${(poolReturn15d(p) as number) >= 0 ? '+' : ''}${(poolReturn15d(p) as number).toFixed(2)}%` : '—'}</span>
                 <span className="tnum text-right text-muted">{fmtUsd(p.tvl_usd)}</span>
               </div>
             ))}

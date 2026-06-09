@@ -11,16 +11,14 @@ export interface Pool {
   volume_usd_24h: number | null;
   fee_tier: number | null;
   risk_score: number | null;
-  // ── rendimento LÍQUIDO de IL (a cascata honesta) ──
-  fee_apr: number | null; // % fee (componente)
-  reward_apr: number | null; // % incentivo (TEMPORÁRIO)
-  il_pct: number | null; // % IL na janela (0 = sem IL; null = aplicável mas não medido)
-  cost_apr: number | null;
-  net_window_pct: number | null; // resultado líquido NA janela
-  net_apr: number | null; // % anualizado líquido
-  net_apy: number | null; // % composto líquido (headline)
-  range_low: number | null;
-  range_high: number | null;
+  // ── rendimento REALIZADO em 15 dias (o número honesto) ──
+  return_15d: number | null; // % que rendeu nos últimos 15 dias (HEADLINE)
+  net_annual_15d: number | null; // % anualizado (estimativa, secundário)
+  fee_return_15d: number | null; // fee realizado em 15d
+  reward_return_15d: number | null; // incentivo realizado em 15d (TEMPORÁRIO)
+  il_15d: number | null; // % IL em 15d (0 = sem IL; null = aplicável mas não medido)
+  vol_low: number | null; // apyBase mínimo nos 15d (%)
+  vol_high: number | null; // apyBase máximo nos 15d (%)
   window_days: number | null;
   exposure: string | null;
   il_risk: string | null;

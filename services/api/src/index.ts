@@ -14,7 +14,7 @@ app.get('/api/pools', async (_req, res) => {
   try {
     const rows = await sql`
       SELECT * FROM pools
-      ORDER BY risk_score DESC NULLS LAST, COALESCE(net_apr, apy_base, 0) DESC`;
+      ORDER BY risk_score DESC NULLS LAST, COALESCE(net_annual_15d, apy_base, 0) DESC`;
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: String(e) });
@@ -37,13 +37,17 @@ app.get('/api/stats', async (_req, res) => {
   }
 });
 
-/** Melhor opção AGORA: melhor rendimento líquido entre as razoavelmente seguras. */
+/** Melhor opção AGORA: melhor rendimento (base 15d) entre as seguras, PREFERINDO baixa volatilidade
+ *  (pool que oscilou pouco). Não destaca spike de pool volátil. */
 app.get('/api/best', async (_req, res) => {
   try {
     const [best] = await sql`
       SELECT * FROM pools
-      WHERE net_apr IS NOT NULL AND net_apr > 0 AND risk_score >= 60
-      ORDER BY net_apr DESC LIMIT 1`;
+      WHERE return_15d IS NOT NULL AND return_15d > 0 AND risk_score >= 65
+      ORDER BY
+        (CASE WHEN vol_low > 0 AND vol_high <= vol_low * 3 THEN 0 ELSE 1 END),
+        net_annual_15d DESC
+      LIMIT 1`;
     res.json(best ?? null);
   } catch (e) {
     res.status(500).json({ error: String(e) });

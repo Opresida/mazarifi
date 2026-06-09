@@ -4,12 +4,13 @@ import { RiskBadge } from './RiskBadge';
 
 export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void }) {
   const isNT = pool.source === 'nortoken';
-  const hasNet = pool.net_apr != null;
+  const hasReturn = pool.return_15d != null;
   const b = riskBand(pool.risk_score);
-  const win = pool.window_days ?? 7;
-  const gross = (pool.fee_apr ?? 0) + (pool.reward_apr ?? 0);
-  const showRange = pool.range_low != null && pool.range_high != null && Math.abs(pool.range_high - pool.range_low) >= 0.1;
-  const netLabel = showRange ? `${fmtPct(pool.range_low, 1)} – ${fmtPct(pool.range_high, 1)}` : fmtPct(pool.net_apr, 1);
+  const win = pool.window_days ?? 15;
+  const ret = pool.return_15d;
+  const retLabel = ret != null ? `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%` : '—';
+  const volBandTxt = pool.vol_low != null && pool.vol_high != null ? `${Math.round(pool.vol_low)}% a ${Math.round(pool.vol_high)}%` : null;
+  const volatile = pool.vol_low != null && pool.vol_high != null && pool.vol_low > 0 && pool.vol_high > pool.vol_low * 2.5;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -41,49 +42,45 @@ export function PoolDetail({ pool, onClose }: { pool: Pool; onClose: () => void 
           </div>
         </div>
 
-        {/* rendimento LÍQUIDO — a cascata honesta */}
+        {/* rendimento REALIZADO 15d — a cascata honesta */}
         <div className="mt-4 rounded-2xl border border-edge-soft bg-panel-solid p-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-2">Rendimento líquido</p>
-            <span className="rounded-md bg-panel-2 px-2 py-0.5 text-[10px] text-muted">janela {win}d</span>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-2">Rendeu nos últimos {win} dias</p>
+            <span className="rounded-md bg-panel-2 px-2 py-0.5 text-[10px] text-muted">realizado</span>
           </div>
 
-          {hasNet ? (
+          {hasReturn ? (
             <>
               <div className="mt-2">
-                <span
-                  className="font-display tnum text-3xl font-bold"
-                  style={{ color: (pool.net_apr ?? 0) < 0 ? 'var(--color-rose)' : 'var(--color-gold)' }}
-                >
-                  {netLabel}
+                <span className="font-display tnum text-3xl font-bold" style={{ color: (ret ?? 0) < 0 ? 'var(--color-rose)' : 'var(--color-safe)' }}>
+                  {retLabel}
                 </span>
-                <span className="ml-2 text-xs text-muted-2">net a.a. (faixa)</span>
+                <span className="ml-2 text-xs text-muted-2">em {win} dias · ≈ {(pool.net_annual_15d ?? 0).toFixed(0)}%/ano</span>
               </div>
               <div className="mt-3 space-y-1.5 text-sm">
-                <CascadeRow label="Fee (quem troca paga)" value={`+${fmtPct(pool.fee_apr)}`} tone="pos" />
-                {pool.reward_apr ? (
-                  <CascadeRow label="Incentivo (emissão)" value={`+${fmtPct(pool.reward_apr)}`} tone="pos" tag="temporário" />
+                <CascadeRow label="Fee (quem troca paga)" value={`+${fmtPct(pool.fee_return_15d, 2)}`} tone="pos" />
+                {pool.reward_return_15d ? (
+                  <CascadeRow label="Incentivo (emissão)" value={`+${fmtPct(pool.reward_return_15d, 2)}`} tone="pos" tag="temporário" />
                 ) : null}
-                <CascadeRow label={`Perda impermanente (${win}d)`} value={pool.il_pct ? `−${fmtPct(pool.il_pct, 2)}` : '0%'} tone="neg" />
-                <CascadeRow label="Custos" value={pool.cost_apr ? `−${fmtPct(pool.cost_apr)}` : '~0%'} tone="neg" />
+                <CascadeRow label="Perda impermanente" value={pool.il_15d ? `−${fmtPct(pool.il_15d, 2)}` : '0%'} tone="neg" />
                 <div className="!mt-2 border-t border-edge-soft pt-2">
-                  <CascadeRow label="LÍQUIDO (net)" value={netLabel} tone="net" />
+                  <CascadeRow label={`RENDEU (em ${win} dias)`} value={retLabel} tone="net" />
                 </div>
               </div>
               <p className="mt-3 text-xs leading-relaxed text-muted-2">
-                Anualizado de uma janela real de {win}d (fee {isNT ? 'on-chain do SwapTracked' : 'DefiLlama'}) e{' '}
-                <span className="text-iris-bright">líquido de IL</span>. A faixa ={' '}
-                <span className="text-rose">sem o incentivo</span> (se a emissão secar) ↔ <span className="text-gold">com o
-                incentivo hoje</span> — porque incentivo é frágil.
+                Número <span className="text-safe">realizado</span> (aconteceu de verdade) na janela de {win} dias, já{' '}
+                <span className="text-safe">líquido de IL</span>. O "%/ano" é só uma projeção.
+                {volatile && volBandTxt && (
+                  <> ⚠ <span className="text-rose">Varia muito</span>: nesses {win} dias oscilou de <b>{volBandTxt}</b> ao ano.</>
+                )}
               </p>
             </>
           ) : (
             <p className="mt-2 text-sm leading-relaxed text-muted">
               {pool.il_risk === 'yes' ? (
                 <>
-                  Esta pool <span className="text-rose">tem risco de IL</span> e ainda não medimos o IL dela — então
-                  mostramos só o <span className="text-gold">reportado ({fmtPct(pool.apy_base)})</span> e{' '}
-                  <b>não fingimos</b> que é líquido. Medir o IL é o próximo refinamento.
+                  Esta pool <span className="text-rose">tem risco de IL</span> e ainda não medimos o IL dela — mostramos só
+                  o <span className="text-gold">reportado ({fmtPct(pool.apy_base)})</span> e <b>não fingimos</b> que é líquido.
                 </>
               ) : (
                 <>Reportado: <span className="text-gold">{fmtPct(pool.apy_base)}</span>.</>

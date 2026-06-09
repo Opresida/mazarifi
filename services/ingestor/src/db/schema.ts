@@ -14,6 +14,14 @@ export const pools = pgTable('pools', {
   volumeUsd24h: doublePrecision('volume_usd_24h'),
   feeTier: doublePrecision('fee_tier'),
   riskScore: integer('risk_score'),
+  // ── rendimento REALIZADO em 15 dias (honesto) ──
+  return15d: doublePrecision('return_15d'), // % que rendeu nos últimos 15 dias (headline)
+  netAnnual15d: doublePrecision('net_annual_15d'), // % anualizado (estimativa)
+  feeReturn15d: doublePrecision('fee_return_15d'),
+  rewardReturn15d: doublePrecision('reward_return_15d'),
+  il15d: doublePrecision('il_15d'),
+  volLow: doublePrecision('vol_low'),
+  volHigh: doublePrecision('vol_high'),
   // ── rendimento LÍQUIDO de IL (a cascata honesta) ──
   feeApr: doublePrecision('fee_apr'), // % fee (componente)
   rewardApr: doublePrecision('reward_apr'), // % incentivo (TEMPORÁRIO)

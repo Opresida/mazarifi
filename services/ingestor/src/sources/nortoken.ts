@@ -30,9 +30,10 @@ export async function fetchNortokenPools(): Promise<NormalizedPool[]> {
     const volumeUsd24h = (Number(stats.anchorVolumeWei) / 1e18) * ETH_USD; // REAL (ground-truth)
     const tvlUsd = (Number(lock.principalLiquidity) / 1e18) * ETH_USD * 2; // aprox: principal nos 2 lados
 
-    // fee anualizado (do volume real) + IL realizado do lançamento (1:1) ao preço atual
+    // fee anualizado (do volume real) → realizado em 15d; IL realizado do lançamento (1:1) ao preço atual
     const feeAprPct = tvlUsd > 0 ? feeAprGross({ volume24hUsd: volumeUsd24h, feeTier: 0.003, activeTvlUsd: tvlUsd }) * 100 : null;
-    const ilPct = price != null && price > 0 ? Math.abs(ilFullRange(price)) * 100 : null; // r = preçoAtual/1 (launch 1:1)
+    const feeReturn15d = feeAprPct != null ? (feeAprPct * 15) / 365 : null;
+    const ilPct15d = price != null && price > 0 ? Math.abs(ilFullRange(price)) * 100 : null; // r = preçoAtual/1 (launch 1:1)
 
     out.push({
       poolKey: `nortoken:${pid}`,
@@ -42,15 +43,16 @@ export async function fetchNortokenPools(): Promise<NormalizedPool[]> {
       project: 'nortoken',
       symbol: s.symbol,
       tvlUsd,
-      apyBase: null, // recalculado no enrich a partir do volume real
+      apyBase: null,
       apyReward: null,
       volumeUsd24h,
       feeTier: 0.003, // pool 0,3%
-      feeAprPct,
-      rewardAprPct: null,
-      ilPct,
-      windowDays: 7, // nominal (pool recém-semeada)
-      apyMean30d: null,
+      feeReturn15d,
+      rewardReturn15d: 0,
+      ilPct15d,
+      volLow: feeAprPct,
+      volHigh: feeAprPct,
+      windowDays: 15,
       exposure: 'multi',
       ilRisk: 'yes',
       contractAgeDays: 1, // recém-semeada (honesto: nova = idade baixa)

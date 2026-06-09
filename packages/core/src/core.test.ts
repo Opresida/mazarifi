@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ilFullRange, concentratedAmplification, ilConcentrated, ilToUsd } from './il';
-import { feeAprGross, aprNet, aprToApy, netYield } from './apy';
+import { feeAprGross, aprNet, aprToApy, netYield, windowReturn } from './apy';
 import { honestScoreboard } from './scoreboard';
 import { riskScore, riskBand, type RiskInput } from './risk';
 import { migrationAdvice } from './migration';
@@ -73,6 +73,18 @@ describe('netYield — LÍQUIDO de IL (o coração)', () => {
     const comReward = netYield({ feeAprPct: 8, rewardAprPct: 4, ilPct: 0.1, windowDays: 7 });
     expect(comReward.netApr).toBeGreaterThan(semReward.netApr);
     expect(comReward.rewardPct).toBe(4);
+  });
+});
+
+describe('windowReturn — "rendeu X% nos últimos N dias" (realizado)', () => {
+  it('fee 2% − IL 0,5% em 15d ⇒ rendeu 1,5%; anualizado 36,5%', () => {
+    const w = windowReturn({ feeReturnPct: 2, ilPct: 0.5, windowDays: 15 });
+    expect(w.returnPct).toBeCloseTo(1.5, 9);
+    expect(w.annualizedPct).toBeCloseTo(36.5, 6);
+  });
+  it('IL pode tornar o período NEGATIVO', () => {
+    const w = windowReturn({ feeReturnPct: 0.5, ilPct: 2, windowDays: 15 });
+    expect(w.returnPct).toBeLessThan(0);
   });
 });
 

@@ -88,3 +88,26 @@ export function netYield(i: NetYieldInput): NetYield {
   const netApy = aprToApy(netApr / 100, i.harvestPerYear ?? 365) * 100;
   return { feePct, rewardPct, ilPct, costPct, netWindowPct, netApr, netApy, windowDays };
 }
+
+/**
+ * Retorno REALIZADO de uma janela (o número mais honesto: "rendeu X% nos últimos N dias").
+ * Tudo em % DO PERÍODO: fee + incentivo − IL − custos. `annualizedPct` é estimativa (× 365/N).
+ * Golden: fee 2%, IL 0,5% em 15d ⇒ rendeu 1,5%; anualizado 1,5 × 365/15 = 36,5%.
+ */
+export interface WindowReturnInput {
+  feeReturnPct: number;
+  rewardReturnPct?: number;
+  ilPct?: number;
+  costPct?: number;
+  windowDays: number;
+}
+export interface WindowReturn {
+  returnPct: number;
+  annualizedPct: number;
+  windowDays: number;
+}
+export function windowReturn(i: WindowReturnInput): WindowReturn {
+  const win = i.windowDays > 0 ? i.windowDays : 15;
+  const returnPct = (i.feeReturnPct || 0) + (i.rewardReturnPct || 0) - Math.max(0, i.ilPct || 0) - Math.max(0, i.costPct || 0);
+  return { returnPct, annualizedPct: (returnPct * 365) / win, windowDays: win };
+}

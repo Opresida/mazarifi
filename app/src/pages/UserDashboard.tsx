@@ -3,8 +3,8 @@ import { Link } from 'wouter';
 import { Home, Compass, Wallet, Clock, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import type { Pool } from '../types';
 import { fetchPools, fetchBest } from '../api';
-import { poolNet, poolName, whyBest } from '../lib/pool';
-import { fmtPct } from '../lib/format';
+import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand } from '../lib/pool';
+import { fmtAgo } from '../lib/format';
 import { Shell, type NavItem } from '../components/Shell';
 import { Card, RiskPill, SectionTitle } from '../components/atoms';
 import { OpportunityCard } from '../components/OpportunityCard';
@@ -40,9 +40,9 @@ export function UserDashboard() {
 
   const list = useMemo(() => {
     return pools
-      .filter((p) => poolNet(p) != null)
+      .filter((p) => poolReturn15d(p) != null)
       .filter((p) => (q ? p.symbol.toLowerCase().includes(q.toLowerCase()) || p.project.toLowerCase().includes(q.toLowerCase()) : true))
-      .sort((a, b) => (poolNet(b) ?? 0) - (poolNet(a) ?? 0));
+      .sort((a, b) => (poolAnnual(b) ?? 0) - (poolAnnual(a) ?? 0));
   }, [pools, q]);
 
   return (
@@ -60,7 +60,10 @@ export function UserDashboard() {
       }
     >
       <h1 className="font-display text-2xl font-bold text-ftext">Onde seu dinheiro rende mais hoje</h1>
-      <p className="mt-1 text-sm text-muted">Já com as perdas descontadas. Sem cilada, em linguagem clara.</p>
+      <p className="mt-1 text-sm text-muted">
+        Já com as perdas descontadas. Sem cilada, em linguagem clara.
+        {best?.updated_at && <span className="text-muted-2"> · atualizado {fmtAgo(best.updated_at)}</span>}
+      </p>
 
       {/* Melhor opção agora */}
       <div className="mt-5 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -75,8 +78,14 @@ export function UserDashboard() {
                 <span className="rounded bg-ink px-1.5 py-0.5 text-[10px] text-muted-2">{best.chain}</span>
                 <RiskPill score={best.risk_score} />
               </div>
-              <p className="font-display tnum mt-2 text-4xl font-bold text-lime">
-                {fmtPct(poolNet(best), 1)} <span className="text-base font-normal text-muted-2">por ano (líquido)</span>
+              <p className="font-display tnum mt-2 text-4xl font-bold" style={{ color: (best.return_15d ?? 0) < 0 ? 'var(--color-risky)' : 'var(--color-lime)' }}>
+                {best.return_15d != null ? `${best.return_15d >= 0 ? '+' : ''}${best.return_15d.toFixed(2)}%` : '—'}
+                <span className="text-base font-normal text-muted-2"> nos últimos 15 dias</span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted-2">
+                ≈ {poolAnnual(best)?.toFixed(0)}% ao ano (estimativa)
+                {isConcentrated(best) && ' · pool concentrada (assume range ideal)'}
+                {isVolatile(best) && volBand(best) && ` · ⚠ variou de ${volBand(best)}`}
               </p>
               <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">{whyBest(best)}</p>
               <button
@@ -92,7 +101,7 @@ export function UserDashboard() {
         </div>
 
         {/* Projetor de ganho (na melhor opção) */}
-        <MoneyProjector netAprPct={best ? poolNet(best) : null} title="Quanto você quer aplicar na melhor opção?" />
+        <MoneyProjector netAprPct={best ? poolAnnual(best) : null} title="Quanto você quer aplicar na melhor opção?" />
       </div>
 
       {/* Lista de oportunidades */}

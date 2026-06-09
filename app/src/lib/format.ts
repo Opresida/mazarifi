@@ -17,6 +17,15 @@ export function fmtPct(v: number | null | undefined, digits = 1): string {
   return `${v.toFixed(digits)}%`;
 }
 
+/** "agora" / "há X min" / "há Xh" a partir de um ISO timestamp. */
+export function fmtAgo(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (diffMin < 1) return 'agora';
+  if (diffMin < 60) return `há ${diffMin} min`;
+  return `há ${Math.floor(diffMin / 60)}h`;
+}
+
 /** Nível de segurança em linguagem leiga (alto score = mais seguro). */
 export function safetyBand(score: number | null): { label: string; color: string; bg: string } {
   if (score == null) return { label: '—', color: 'var(--color-muted)', bg: 'rgba(138,143,163,.12)' };

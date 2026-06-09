@@ -37,15 +37,13 @@ async function main() {
       volumeUsd24h: p.volumeUsd24h,
       feeTier: p.feeTier,
       riskScore: p.riskScore,
-      feeApr: p.feeApr,
-      rewardApr: p.rewardApr,
-      ilPct: p.ilPctOut,
-      costApr: p.costApr,
-      netWindowPct: p.netWindowPct,
-      netApr: p.netApr,
-      netApy: p.netApy,
-      rangeLow: p.rangeLow,
-      rangeHigh: p.rangeHigh,
+      return15d: p.return15d,
+      netAnnual15d: p.netAnnual15d,
+      feeReturn15d: p.feeReturn15d,
+      rewardReturn15d: p.rewardReturn15d,
+      il15d: p.ilPct15d,
+      volLow: p.volLow,
+      volHigh: p.volHigh,
       windowDays: p.windowDays,
       exposure: p.exposure,
       ilRisk: p.ilRisk,
@@ -57,23 +55,22 @@ async function main() {
   }
   console.log(`✅ ${all.length} pools persistidas no Neon.\n`);
 
-  // RANKING honesto — CEGO À ORIGEM: ordena por risco, depois rendimento LÍQUIDO. `source` NÃO interfere.
-  const netOf = (p: EnrichedPool) => p.netApr ?? p.apyBase ?? 0;
+  // RANKING — CEGO À ORIGEM: risco, depois rendimento anualizado (base 15d). `source` NÃO interfere.
+  const netOf = (p: EnrichedPool) => p.netAnnual15d ?? p.apyBase ?? 0;
   const ranked = [...all].sort((a, b) => b.riskScore - a.riskScore || netOf(b) - netOf(a));
 
-  console.log('=== TOP 15 (risco + rendimento LÍQUIDO de IL · cego à origem) ===');
-  console.log('net = fee + incentivo − IL − custos (anualizado da janela) · faixa = sem↔com incentivo\n');
+  console.log('=== TOP 15 (risco + "rendeu X% em 15 dias" · cego à origem) ===\n');
   for (const p of ranked.slice(0, 15)) {
-    const net =
-      p.netApr != null
-        ? `net ${p.netApr.toFixed(1)}%${p.ilPctOut ? ` (IL −${p.ilPctOut.toFixed(2)}%/${p.windowDays}d)` : ''}`
+    const ret =
+      p.return15d != null
+        ? `rendeu ${p.return15d >= 0 ? '+' : ''}${p.return15d.toFixed(2)}% em 15d (≈${(p.netAnnual15d ?? 0).toFixed(0)}%/ano)`
         : p.apyBase != null
           ? `APY ${p.apyBase.toFixed(1)}% (reportado)`
           : '—';
-    const sym = p.symbol.slice(0, 16).padEnd(16);
-    const proj = p.project.slice(0, 13).padEnd(13);
+    const sym = p.symbol.slice(0, 15).padEnd(15);
+    const proj = p.project.slice(0, 12).padEnd(12);
     const tvl = `$${Math.round(p.tvlUsd ?? 0).toLocaleString('en-US')}`.padStart(13);
-    console.log(`risco ${String(p.riskScore).padStart(3)} | ${sym} | ${proj} | TVL ${tvl} | ${net}`);
+    console.log(`risco ${String(p.riskScore).padStart(3)} | ${sym} | ${proj} | TVL ${tvl} | ${ret}`);
   }
   process.exit(0);
 }
