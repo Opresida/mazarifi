@@ -29,3 +29,4 @@ jobs:
         run: pnpm -F @mazarifi/ingestor ingest
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }} # opcional: desbloqueia idade + contrato verificado dos tokens
