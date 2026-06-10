@@ -1,6 +1,6 @@
 import type { Pool, NetworkInfo } from '../types';
 import { fmtUsd, fmtUsdExact, fmtPct, fmtAgo, riskBand } from '../lib/format';
-import { poolEntryCostPct, poolGasUsd } from '../lib/pool';
+import { poolEntryCostPct, poolGasUsd, managedInfo } from '../lib/pool';
 import { RiskBadge } from './RiskBadge';
 
 export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: NetworkInfo | null; onClose: () => void }) {
@@ -31,6 +31,7 @@ export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: Ne
 /** Conteúdo reutilizável — usado no drawer e na página do ativo (`/pool/:key`). */
 export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: NetworkInfo | null }) {
   const isNT = pool.source === 'nortoken';
+  const managed = managedInfo(pool);
   const hasReturn = pool.return_15d != null;
   const entryCost = poolEntryCostPct(pool);
   const gasUsd = poolGasUsd(pool, net);
@@ -57,7 +58,25 @@ export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: Netw
           </div>
         </div>
 
-        {/* rendimento REALIZADO 15d — a cascata honesta */}
+        {managed ? (
+          /* pool GERENCIADA: a Beefy cuida do range → mostramos o APY do vault (não a cascata fee/IL) */
+          <div className="mt-4 rounded-2xl border border-iris/30 bg-iris/5 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-iris">APY gerenciado</p>
+              <span className="rounded-md bg-panel-2 px-2 py-0.5 text-[10px] text-muted">estimativa</span>
+            </div>
+            <div className="mt-2">
+              <span className="font-display tnum text-3xl font-bold text-iris">{(pool.net_annual_15d ?? pool.apy_base ?? 0).toFixed(1)}%</span>
+              <span className="ml-2 text-xs text-muted-2">ao ano</span>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-muted-2">
+              ⚙ <b className="text-ftext">A {managed.manager} cuida do range</b> e faz auto-compound pra você — taxa de{' '}
+              <b>{managed.managerFeePct}%</b> sobre o rendimento, já embutida nesse APY. Pool <b>concentrada</b> · o número{' '}
+              <span className="text-rose">pode variar bastante</span> (APY de pool concentrada oscila). Liquidez do pool:{' '}
+              <b>{fmtUsd(pool.tvl_usd)}</b>.
+            </p>
+          </div>
+        ) : (
         <div className="mt-4 rounded-2xl border border-edge-soft bg-panel-solid p-4">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-2">Rendeu nos últimos {win} dias</p>
@@ -108,6 +127,7 @@ export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: Netw
             </p>
           )}
         </div>
+        )}
 
         {/* incentivo: informar a SOLIDEZ do token, não assustar à toa */}
         {hasReward &&

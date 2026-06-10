@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { Compass, Wallet, ArrowRight, Landmark, Repeat } from 'lucide-react';
 import type { Pool, BestPicks, NetworkInfo } from '../types';
 import { fetchPools, fetchBest, fetchNetwork } from '../api';
-import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand, poolEntryCostPct, poolGasUsd } from '../lib/pool';
+import { poolReturn15d, poolAnnual, poolName, whyBest, isConcentrated, isVolatile, volBand, poolEntryCostPct, poolGasUsd, managedInfo } from '../lib/pool';
 import { fmtAgo } from '../lib/format';
 import { Filters, applyFilters } from '../components/Filters';
 import { Shell, type NavItem } from '../components/Shell';
@@ -186,19 +186,33 @@ function HighlightCard({ kind, pool, loading, onOpen }: { kind: 'lending' | 'tra
             <span className="rounded bg-ink px-1.5 py-0.5 text-[10px] text-muted-2">{pool.chain}</span>
             <RiskPill score={pool.risk_score} />
           </div>
-          <p
-            className="font-display tnum mt-2 text-3xl font-bold"
-            style={{ color: (pool.return_15d ?? 0) < 0 ? 'var(--color-risky)' : isLending ? 'var(--color-lime)' : 'var(--color-gold)' }}
-          >
-            {pool.return_15d != null ? `${pool.return_15d >= 0 ? '+' : ''}${pool.return_15d.toFixed(2)}%` : '—'}
-            <span className="text-sm font-normal text-muted-2"> em 15 dias</span>
-          </p>
-          <p className="mt-0.5 text-xs text-muted-2">
-            {poolAnnual(pool) != null ? `≈ ${poolAnnual(pool)!.toFixed(0)}% ao ano` : 'anual indisponível'}
-            {entry > 0 && ` · custo de entrada ~${entry.toFixed(2)}%`}
-            {isConcentrated(pool) && ' · concentrada'}
-            {isVolatile(pool) && volBand(pool) && ` · ⚠ variou ${volBand(pool)}`}
-          </p>
+          {managedInfo(pool) ? (
+            <>
+              <p className="font-display tnum mt-2 text-3xl font-bold text-iris">
+                {poolAnnual(pool) != null ? `${poolAnnual(pool)!.toFixed(1)}%` : '—'}
+                <span className="text-sm font-normal text-muted-2"> ao ano</span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted-2">
+                ⚙ APY gerenciado · a {managedInfo(pool)?.manager} cuida do range (taxa {managedInfo(pool)?.managerFeePct}%) · estimativa · concentrada
+              </p>
+            </>
+          ) : (
+            <>
+              <p
+                className="font-display tnum mt-2 text-3xl font-bold"
+                style={{ color: (pool.return_15d ?? 0) < 0 ? 'var(--color-risky)' : isLending ? 'var(--color-lime)' : 'var(--color-gold)' }}
+              >
+                {pool.return_15d != null ? `${pool.return_15d >= 0 ? '+' : ''}${pool.return_15d.toFixed(2)}%` : '—'}
+                <span className="text-sm font-normal text-muted-2"> em 15 dias</span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted-2">
+                {poolAnnual(pool) != null ? `≈ ${poolAnnual(pool)!.toFixed(0)}% ao ano` : 'anual indisponível'}
+                {entry > 0 && ` · custo de entrada ~${entry.toFixed(2)}%`}
+                {isConcentrated(pool) && ' · concentrada'}
+                {isVolatile(pool) && volBand(pool) && ` · ⚠ variou ${volBand(pool)}`}
+              </p>
+            </>
+          )}
           <button
             onClick={() => onOpen(pool)}
             className={`mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-ink ${isLending ? 'bg-lime hover:bg-lime-bright' : 'bg-gold hover:brightness-110'}`}
