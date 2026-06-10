@@ -36,15 +36,16 @@ Documento de contexto profundo (decisões, restrições, convenções) que **nã
 | 2 Keeper | Médio | rebalance NÃO saca; EOA→Safe+módulo antes da mainnet |
 | 3 Performance fee | Alto | parece gestão → gate jurídico |
 
-## Monetização (spec FINAL — `docs/mazari-fi-spec.md`)
+## Monetização (spec **v2** FINAL — `docs/mazari-fi-spec.md`)
 
-Modelo travado. **Rota B** (vault de terceiro), camadas de receita:
-- **Entrada (Enso): 0,30% (30 bps), saída 0%.** ✅ ativa (`fee=30` + `feeReceiver=tesouro`). Recupera-se em ~11 dias + filtra capital mercenário. **Não** vender como "mais barato que a Beefy" (em Rota B o user paga a taxa da Beefy por baixo + a nossa por cima).
-- **Mazari Pro:** assinatura por **tier de depósito**; regra-mestra **preço ≤ 35% do lucro líquido anual** (`preço_mês = 0,35 × depósito × APY_líq / 12`). **APY líquido REAL (Beefy Base, verificado):** perf fee 9,5% uniforme; estáveis ~3-5%, blue-chip ~10-30% (volátil). Tiers ancoram no APY que o Humberto escolher (tabela não travada).
-- **Swap fee 0,2%** no auto-switch (hook, só Pro) · **Rebates LiFi** (bridging) · **Slippage positivo 50/50** declarado na tela.
-- **Performance fee 8-10% + harvest:** Rota A (deferida, precisa auditoria).
-- **Limite Rota B:** a taxa do vault de terceiro (~9,5%) é **intocável** (sem revenue-share público) — não implementar skim; mostrar com transparência.
-- Princípio: **honest DeFi — nenhuma taxa escondida** (tudo na tela, inclusive a do parceiro).
+Modelo TRAVADO. **Rota B** (vault de terceiro). **Basic vs Pro:**
+- **Basic ($0):** depositar/render/escolher vault no **manual** (sem auto-switch). Monetizado só nas taxas automáticas.
+- **Pro (pago, POR CARTEIRA):** desbloqueia o **Autopilot** (auto-switch) + mais vaults + prioridade. Por carteira = anti-split.
+- **Entrada (Enso): 0,30% (30 bps), saída 0%.** ✅ **ATIVA** — `feeReceiver = 0x8ed2322492dba29d2d783a7de0c873c51444cbd2` (tesouro, no `api/.env`). Aplica a Basic e Pro.
+- **Tabela Pro FINAL (âncora 5%, degraus de $5, ≤35% do lucro):** Basic $0–$3.500 → Pro **$5** ($3.5–7k) · **$10** ($7–10.5k) · **$15** ($10.5–14k) · **$20** ($14–17.5k) · **$25** ($17.5k+). Fórmula-verdade: `preço_mês = 0,35 × dep × APY_líq / 12`. **Rail dinâmico:** o código cobra no máx 35% do lucro com o **APY REAL do vault** (publicada usa 5%). Por que 5%: APY seguro real (estáveis Base). Por que 35% (não 45%): user já paga ~9,5% da Beefy por baixo.
+- **Swap 0,2%** no auto-switch (hook, só Pro) · **Rebates LiFi** · **Slippage 50/50** declarado.
+- **Perf fee 8-10% + harvest:** Rota A (deferida, precisa auditoria). **Limite Rota B:** taxa do vault (~9,5%) **intocável** (sem revenue-share público) — mostrar, não skimmar.
+- Princípio: **honest DeFi — nenhuma taxa escondida** (tudo na tela, inclusive a do parceiro). **Saída sempre 0%.**
 
 ## Documentos canônicos (manter atualizados)
 
