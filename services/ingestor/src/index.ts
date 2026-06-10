@@ -6,6 +6,7 @@ import { db } from './db/client.js';
 import { pools, network } from './db/schema.js';
 import { fetchBasePools } from './sources/defillama.js';
 import { fetchNortokenPools } from './sources/nortoken.js';
+import { fetchBeefyManagedPools } from './sources/beefy.js';
 import { fetchEthUsd } from './prices.js';
 import { enrich, type EnrichedPool } from './enrich.js';
 
@@ -13,7 +14,7 @@ async function main() {
   console.log('🔎 Ingestor Mazari Fi — puxando pools REAIS...\n');
   const runStart = new Date();
 
-  const [external, nortoken] = await Promise.all([
+  const [external, nortoken, beefy] = await Promise.all([
     fetchBasePools(40).catch((e) => {
       console.error('DefiLlama falhou:', e.message);
       return [];
@@ -22,10 +23,14 @@ async function main() {
       console.error('Nortoken falhou:', e.message);
       return [];
     }),
+    fetchBeefyManagedPools(50).catch((e) => {
+      console.error('Beefy falhou:', e.message);
+      return [];
+    }),
   ]);
 
-  const all: EnrichedPool[] = [...external, ...nortoken].map(enrich);
-  console.log(`Pools: ${external.length} DefiLlama (Base) + ${nortoken.length} Nortoken = ${all.length}\n`);
+  const all: EnrichedPool[] = [...external, ...nortoken, ...beefy].map(enrich);
+  console.log(`Pools: ${external.length} DefiLlama + ${nortoken.length} Nortoken + ${beefy.length} Beefy gerenciadas = ${all.length}\n`);
 
   // upsert no Neon
   for (const p of all) {

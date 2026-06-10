@@ -193,7 +193,7 @@ function ensoSlug(project: string): string | null {
 }
 
 // Projetos que conseguimos ZAPAR (executar/monetizar) — sincronizado com ensoSlug. Usado pra esconder o resto do ranking.
-const ZAPPABLE_RE = 'aerodrome|uniswap|sushiswap|morpho|gauntlet|curve|balancer|aave|spark|moonwell|fluid|compound|pendle';
+const ZAPPABLE_RE = 'aerodrome|uniswap|sushiswap|morpho|gauntlet|curve|balancer|aave|spark|moonwell|fluid|compound|pendle|beefy';
 
 app.get('/api/zap/quote', async (req, res) => {
   try {
@@ -206,16 +206,23 @@ app.get('/api/zap/quote', async (req, res) => {
 
     const [pool] = await sql`SELECT project, raw FROM pools WHERE pool_key = ${poolKey} LIMIT 1`;
     if (!pool) return res.json({ supported: false, reason: 'pool não encontrada' });
-    const slug = ensoSlug(pool.project);
-    const underlying: string[] = (pool.raw?.underlyingTokens ?? []) as string[];
-    if (!slug || underlying.length === 0) return res.json({ supported: false, reason: 'protocolo sem zap' });
 
-    // resolve a posição (LP/vault) alvo no Enso pelos tokens do par
-    const tq = new URLSearchParams({ chainId: '8453', protocolSlug: slug, page: '1' });
-    for (const u of underlying) tq.append('underlyingTokens', u);
-    const tr = await fetch(`${ENSO}/tokens?${tq.toString()}`, { headers: ensoHeaders() });
-    const tj = (await tr.json()) as { data?: Array<{ address: string; symbol?: string | null }> };
-    const lp = tj.data?.[0];
+    // Pool GERENCIADA (Beefy-CLM): o alvo do zap é o próprio vault (já resolve range/auto-compound).
+    let lp: { address: string; symbol?: string | null } | undefined;
+    const managedVault = pool.raw?.vaultAddress as string | undefined;
+    if (managedVault) {
+      lp = { address: managedVault, symbol: (pool.raw?.assets as string[] | undefined)?.join('/') ?? null };
+    } else {
+      const slug = ensoSlug(pool.project);
+      const underlying: string[] = (pool.raw?.underlyingTokens ?? []) as string[];
+      if (!slug || underlying.length === 0) return res.json({ supported: false, reason: 'protocolo sem zap' });
+      // resolve a posição (LP) alvo no Enso pelos tokens do par
+      const tq = new URLSearchParams({ chainId: '8453', protocolSlug: slug, page: '1' });
+      for (const u of underlying) tq.append('underlyingTokens', u);
+      const tr = await fetch(`${ENSO}/tokens?${tq.toString()}`, { headers: ensoHeaders() });
+      const tj = (await tr.json()) as { data?: Array<{ address: string; symbol?: string | null }> };
+      lp = tj.data?.[0];
+    }
     if (!lp?.address) return res.json({ supported: false, reason: 'posição não encontrada no Enso' });
 
     const amountIn = BigInt(Math.floor(amountUsdc * 1e6)).toString(); // USDC = 6 casas

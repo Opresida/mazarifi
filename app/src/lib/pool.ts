@@ -1,5 +1,11 @@
-import type { Pool, NetworkInfo } from '../types';
+import type { Pool, NetworkInfo, ManagedRaw } from '../types';
 import { fmtUsd, safetyBand } from './format';
+
+/** Se a pool é GERENCIADA (Beefy-CLM: o gestor cuida do range), retorna os metadados; senão null. */
+export function managedInfo(p: Pool): ManagedRaw | null {
+  const r = p.raw as ManagedRaw | null | undefined;
+  return r && r.managed ? r : null;
+}
 
 /** Rendimento anualizado a usar no ranking/projetor (base 15d; senão o reportado). */
 export function poolAnnual(p: Pool): number | null {

@@ -79,6 +79,19 @@ export interface Pool {
   exposure: string | null;
   il_risk: string | null;
   updated_at: string;
+  raw?: ManagedRaw | Record<string, unknown> | null;
+}
+
+/** Metadados de pool GERENCIADA (Beefy-CLM): o gestor cuida do range. */
+export interface ManagedRaw {
+  managed?: boolean;
+  manager?: string; // 'Beefy'
+  managerFeePct?: number; // ex.: 9.5
+  vaultAddress?: string;
+  riskTier?: 'estavel' | 'blue-chip' | 'major';
+  beefyApy?: number;
+  assets?: string[];
+  underlyingTokens?: string[];
 }
 
 export interface Stats {

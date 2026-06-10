@@ -4,6 +4,7 @@ import { Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, ArrowR
 import type { Pool, NetworkInfo } from '../types';
 import { useWallet, switchToBase, sendTx } from '../lib/wallet';
 import { quoteZap, usdcAllowance, approveUsdc, type ZapQuote } from '../lib/zap';
+import { managedInfo } from '../lib/pool';
 import { Card } from './atoms';
 
 type St = 'idle' | 'quoting' | 'ready' | 'unsupported' | 'approving' | 'depositing' | 'done';
@@ -136,6 +137,9 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | nul
                 <ul className="mt-1.5 space-y-1">
                   <li>• Você deposita <b className="text-ftext">${amount} USDC</b> → entra na posição da pool{quote.lpSymbol ? ` (${quote.lpSymbol})` : ''}.</li>
                   <li>• A Enso troca metade e monta o par (1 transação, não-custodial).</li>
+                  {managedInfo(pool) && (
+                    <li className="text-iris">• ⚙ <b>Gerenciado pela {managedInfo(pool)?.manager}</b>: ela rebalanceia o range e faz auto-compound pra você (taxa {managedInfo(pool)?.managerFeePct}% sobre o rendimento, já embutida no APY).</li>
+                  )}
                   {quote.feeBps ? (
                     <li>• Taxa de entrada Mazari: <b className="text-gold">{(quote.feeBps / 100).toFixed(2)}%</b> (~${(amount * quote.feeBps / 10000).toFixed(2)}, uma vez) — <b className="text-ftext">saída grátis</b>.</li>
                   ) : null}
