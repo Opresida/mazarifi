@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
 import { Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { Pool, NetworkMap } from '../types';
 import { useWallet, switchToChain, sendTx } from '../lib/wallet';
 import { quoteZap, usdcAllowance, approveUsdc, type ZapQuote } from '../lib/zap';
+import { fetchUsdcBalances, quoteBridge, type BridgeQuote } from '../lib/bridge';
 import { managedInfo } from '../lib/pool';
 import { chainCfg } from '../lib/chains';
 import { Card } from './atoms';
@@ -22,6 +23,20 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
   const impactPct = quote?.priceImpact != null ? quote.priceImpact / 100 : null;
   const gasUsd = quote?.gas && n?.gas_price_gwei && n?.eth_usd ? (Number(quote.gas) * n.gas_price_gwei) / 1e9 * n.eth_usd : null;
   const highImpact = impactPct != null && impactPct > 1;
+
+  // AUTO: detecta o USDC do usuário por chain e aponta de onde trazer (ponte) sozinho.
+  const [balances, setBalances] = useState<Record<string, number> | null>(null);
+  const loadBalances = useCallback(async () => {
+    if (address) setBalances(await fetchUsdcBalances(address));
+  }, [address]);
+  useEffect(() => { loadBalances(); }, [loadBalances]);
+
+  const poolBal = balances?.[pool.chain] ?? 0;
+  const srcEntry = balances ? Object.entries(balances).filter(([c]) => c !== pool.chain).sort((a, b) => b[1] - a[1])[0] : undefined;
+  const srcChain = srcEntry?.[0];
+  const srcBal = srcEntry?.[1] ?? 0;
+  // precisa de ponte: não tem USDC suficiente na rede da pool, mas tem em outra
+  const needsBridge = !!address && balances != null && poolBal < amount && srcBal > poolBal && !!srcChain;
 
   async function doQuote() {
     if (!address) return;
@@ -121,9 +136,13 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
           </div>
 
           {st !== 'ready' && st !== 'approving' && st !== 'depositing' && (
-            <button onClick={doQuote} disabled={st === 'quoting' || !(amount > 0)} className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 px-4 py-2.5 text-sm font-semibold text-lime hover:bg-lime/15 disabled:opacity-60">
-              {st === 'quoting' ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Simulando…</span> : 'Simular depósito'}
-            </button>
+            needsBridge && srcChain ? (
+              <BridgeCard fromChain={srcChain} toChain={pool.chain} amount={amount} srcBal={srcBal} address={address!} onBridged={loadBalances} />
+            ) : (
+              <button onClick={doQuote} disabled={st === 'quoting' || !(amount > 0)} className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 px-4 py-2.5 text-sm font-semibold text-lime hover:bg-lime/15 disabled:opacity-60">
+                {st === 'quoting' ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Simulando…</span> : 'Simular depósito'}
+              </button>
+            )
           )}
 
           {st === 'unsupported' && (
@@ -167,5 +186,83 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
         </>
       )}
     </Card>
+  );
+}
+
+type BSt = 'idle' | 'quoting' | 'ready' | 'approving' | 'bridging' | 'done';
+
+/** Ponte automática: a gente achou o USDC do usuário em outra rede e traz pra rede da pool (LiFi, melhor rota). */
+function BridgeCard({ fromChain, toChain, amount, srcBal, address, onBridged }: { fromChain: string; toChain: string; amount: number; srcBal: number; address: string; onBridged: () => void }) {
+  const [bst, setBst] = useState<BSt>('idle');
+  const [bq, setBq] = useState<BridgeQuote | null>(null);
+  const [berr, setBerr] = useState<string | null>(null);
+  const amt = Math.min(amount, srcBal);
+  const outUsd = bq?.toAmount ? Number(bq.toAmount) / 1e6 : null;
+
+  async function doQuote() {
+    setBerr(null);
+    setBst('quoting');
+    try {
+      const q = await quoteBridge(fromChain, toChain, address, amt);
+      if (!q.supported) { setBerr(`Ponte indisponível (${q.reason}).`); setBst('idle'); return; }
+      setBq(q);
+      setBst('ready');
+    } catch (e) {
+      setBerr((e as Error)?.message ?? 'erro');
+      setBst('idle');
+    }
+  }
+
+  async function doBridge() {
+    if (!bq?.to || !bq.data || !bq.spender) return;
+    setBerr(null);
+    try {
+      await switchToChain(fromChain);
+      const need = BigInt(Math.floor(amt * 1e6));
+      if ((await usdcAllowance(address, bq.spender, fromChain)) < need) {
+        setBst('approving');
+        await approveUsdc(bq.spender, fromChain);
+        let ok = false;
+        for (let i = 0; i < 25; i++) {
+          if ((await usdcAllowance(address, bq.spender, fromChain)) >= need) { ok = true; break; }
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+        if (!ok) { setBerr('A aprovação não confirmou — clique de novo.'); setBst('ready'); return; }
+      }
+      setBst('bridging');
+      await sendTx({ to: bq.to, data: bq.data, value: bq.value });
+      setBst('done');
+      setTimeout(onBridged, 12000); // ponte é rápida (~10s) → recarrega o saldo e libera o depósito
+    } catch (e) {
+      const code = (e as { code?: number })?.code;
+      setBerr(code === 4001 ? 'Você cancelou.' : (e as Error)?.message ?? 'erro na ponte');
+      setBst('ready');
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-lime/30 bg-lime/5 p-3 text-[11px] leading-relaxed text-muted">
+      {bst === 'done' ? (
+        <p className="text-lime">✅ <b>USDC a caminho da {toChain}</b> (~{bq?.durationS ?? 10}s). Já já o depósito libera — atualizando…</p>
+      ) : (
+        <>
+          <p>💡 <b className="text-ftext">Seu USDC está na {fromChain}</b> (${srcBal.toFixed(2)}). A gente traz pra <b className="text-ftext">{toChain}</b> pra você — a melhor rota, sem você fazer nada.</p>
+          {bq && (
+            <p className="mt-1.5">Traz <b className="text-ftext">${amt.toFixed(2)}</b> → recebe ~<b className="text-ftext">${outUsd?.toFixed(2)}</b> na {toChain} · ~{bq.durationS ?? 10}s{bq.feePct ? ` · taxa Mazari ${bq.feePct.toFixed(2)}%` : ''} <span className="text-muted-2">(via {bq.tool})</span>.</p>
+          )}
+          <button
+            onClick={bst === 'ready' ? doBridge : doQuote}
+            disabled={bst === 'quoting' || bst === 'approving' || bst === 'bridging'}
+            className="mt-2 w-full rounded-lg bg-lime px-3 py-2 text-xs font-semibold text-ink hover:bg-lime-bright disabled:opacity-60"
+          >
+            {bst === 'quoting' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Calculando a melhor rota…</span>
+              : bst === 'approving' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Aprovando USDC…</span>
+              : bst === 'bridging' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Confirme a ponte na carteira…</span>
+              : bst === 'ready' ? `Trazer $${amt.toFixed(2)} pra ${toChain}` : `Trazer USDC pra ${toChain}`}
+          </button>
+          {berr && <p className="mt-1.5 text-rose">{berr}</p>}
+        </>
+      )}
+    </div>
   );
 }

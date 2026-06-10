@@ -101,6 +101,11 @@ const ensoHeaders = () => ({ Authorization: `Bearer ${process.env.ENSO_API_KEY}`
 const ZAP_FEE_BPS = process.env.ZAP_FEE_BPS || '30'; // 30 bps = 0,30%
 const MAZARI_TREASURY = process.env.MAZARI_TREASURY; // endereço que recebe a taxa
 
+// Ponte cross-chain (LiFi) — funciona sem key; o REBATE precisa do Partner Portal (LIFI_INTEGRATOR) — graceful.
+const LIFI = 'https://li.quest/v1';
+const LIFI_INTEGRATOR = process.env.LIFI_INTEGRATOR; // string do Partner Portal (ativa o rebate)
+const LIFI_FEE = process.env.LIFI_FEE || '0.003'; // 0,3% (declarado na tela)
+
 /** Lê allowance de um ERC20 (server-side, RPC confiável — evita a RPC instável da carteira). token=USDC por padrão. */
 app.get('/api/zap/allowance', async (req, res) => {
   try {
@@ -118,6 +123,84 @@ app.get('/api/zap/allowance', async (req, res) => {
     });
     const j = (await r.json()) as { result?: string };
     res.json({ allowance: j.result ?? '0x0' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
+/** Saldo de USDC do usuário EM CADA chain (pra detectar de onde trazer o dinheiro). */
+app.get('/api/usdc-balances', async (req, res) => {
+  try {
+    const address = String(req.query.address ?? '');
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return res.status(400).json({ error: 'endereço inválido' });
+    const data = '0x70a08231' + address.replace(/^0x/, '').toLowerCase().padStart(64, '0'); // balanceOf(address)
+    const out: Record<string, number> = {};
+    await Promise.all(
+      CHAIN_LIST.map(async (cfg) => {
+        try {
+          const r = await fetch(cfg.rpc, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: cfg.usdc, data }, 'latest'] }),
+          });
+          const j = (await r.json()) as { result?: string };
+          out[cfg.name] = j.result && j.result !== '0x' ? Number(BigInt(j.result)) / 1e6 : 0; // USDC = 6 casas
+        } catch {
+          out[cfg.name] = 0;
+        }
+      }),
+    );
+    res.json(out);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
+/** Ponte de USDC entre redes (LiFi escolhe a MELHOR rota). Rebate só com LIFI_INTEGRATOR (graceful). */
+app.get('/api/bridge/quote', async (req, res) => {
+  try {
+    const fromCfg = chainOf(req.query.fromChain);
+    const toCfg = chainOf(req.query.toChain);
+    const fromAddress = String(req.query.fromAddress ?? '');
+    const amountUsdc = Number(req.query.amountUsdc ?? 0);
+    if (!/^0x[0-9a-fA-F]{40}$/.test(fromAddress) || !(amountUsdc > 0)) return res.status(400).json({ error: 'parâmetros faltando' });
+    if (fromCfg.name === toCfg.name) return res.json({ supported: false, reason: 'mesma rede' });
+    const amount = BigInt(Math.floor(amountUsdc * 1e6)).toString();
+    const q = new URLSearchParams({
+      fromChain: String(fromCfg.chainId),
+      toChain: String(toCfg.chainId),
+      fromToken: fromCfg.usdc,
+      toToken: toCfg.usdc,
+      fromAddress,
+      fromAmount: amount,
+    });
+    const feePct = LIFI_INTEGRATOR ? Number(LIFI_FEE) * 100 : 0;
+    if (LIFI_INTEGRATOR) {
+      q.set('integrator', LIFI_INTEGRATOR);
+      q.set('fee', LIFI_FEE);
+    }
+    const r = await fetch(`${LIFI}/quote?${q.toString()}`);
+    if (!r.ok) return res.json({ supported: false, reason: `LiFi ${r.status}` });
+    const d = (await r.json()) as {
+      transactionRequest?: { to?: string; data?: string; value?: string };
+      estimate?: { toAmount?: string; approvalAddress?: string; executionDuration?: number };
+      tool?: string;
+    };
+    const tx = d.transactionRequest;
+    if (!tx?.to || !tx.data) return res.json({ supported: false, reason: 'sem rota' });
+    res.json({
+      supported: true,
+      to: tx.to,
+      data: tx.data,
+      value: tx.value ?? '0',
+      spender: d.estimate?.approvalAddress ?? tx.to,
+      toAmount: d.estimate?.toAmount ?? null,
+      durationS: d.estimate?.executionDuration ?? null,
+      tool: d.tool ?? null,
+      feePct,
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });
