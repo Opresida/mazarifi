@@ -93,8 +93,8 @@ const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const BASE_RPC = process.env.BASE_RPC || 'https://mainnet.base.org';
 const ensoHeaders = () => ({ Authorization: `Bearer ${process.env.ENSO_API_KEY}` });
 
-// Receita: taxa da Mazari (integrador Enso) — SÓ NO SAQUE. Sem MAZARI_TREASURY, fica sem taxa (graceful).
-const ZAP_FEE_BPS = process.env.ZAP_FEE_BPS || '50'; // 50 bps = 0,5%
+// Receita: taxa da Mazari (integrador Enso) — 0,30% na ENTRADA, saída 0% (spec §2.1). Sem MAZARI_TREASURY, sem taxa (graceful).
+const ZAP_FEE_BPS = process.env.ZAP_FEE_BPS || '30'; // 30 bps = 0,30%
 const MAZARI_TREASURY = process.env.MAZARI_TREASURY; // endereço que recebe a taxa
 
 /** Lê allowance de um ERC20 (server-side, RPC confiável — evita a RPC instável da carteira). token=USDC por padrão. */
@@ -162,17 +162,12 @@ app.get('/api/zap/withdraw', async (req, res) => {
     const fromAddress = String(req.query.fromAddress ?? '');
     const slippageBps = Number(req.query.slippageBps) || 50;
     if (!/^0x[0-9a-fA-F]{40}$/.test(token) || !amount || !fromAddress) return res.status(400).json({ error: 'parâmetros faltando' });
+    // SAÍDA 0% (spec §2.1) — a taxa Mazari é só na ENTRADA (zap-in). Saque sem fee.
     const rq = new URLSearchParams({ chainId: '8453', fromAddress, receiver: fromAddress, amountIn: amount, tokenIn: token, tokenOut: USDC_BASE, routingStrategy: 'router', slippage: String(slippageBps) });
-    // Taxa da Mazari no saque (Enso desconta do amountOut e manda pro tesouro). Sem treasury → sem taxa.
-    const feeBps = MAZARI_TREASURY ? Number(ZAP_FEE_BPS) : 0;
-    if (MAZARI_TREASURY) {
-      rq.set('fee', ZAP_FEE_BPS);
-      rq.set('feeReceiver', MAZARI_TREASURY);
-    }
     const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
     if (!rr.ok) return res.json({ supported: false, reason: `Enso route ${rr.status}` });
     const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
-    res.json({ supported: true, to: d.tx?.to, data: d.tx?.data, value: d.tx?.value ?? '0', spender: d.tx?.to, amountOut: d.amountOut, gas: d.gas, priceImpact: d.priceImpact ?? 0, feeBps });
+    res.json({ supported: true, to: d.tx?.to, data: d.tx?.data, value: d.tx?.value ?? '0', spender: d.tx?.to, amountOut: d.amountOut, gas: d.gas, priceImpact: d.priceImpact ?? 0, feeBps: 0 });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });
@@ -234,6 +229,12 @@ app.get('/api/zap/quote', async (req, res) => {
       routingStrategy: 'router',
       slippage: String(slippageBps),
     });
+    // Taxa Mazari 0,30% na ENTRADA (spec §2.1) — Enso desconta do USDC e manda pro tesouro. Sem treasury → sem taxa.
+    const feeBps = MAZARI_TREASURY ? Number(ZAP_FEE_BPS) : 0;
+    if (MAZARI_TREASURY) {
+      rq.set('fee', ZAP_FEE_BPS);
+      rq.set('feeReceiver', MAZARI_TREASURY);
+    }
     const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
     if (!rr.ok) return res.json({ supported: false, reason: `Enso route ${rr.status}` });
     const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
@@ -251,6 +252,7 @@ app.get('/api/zap/quote', async (req, res) => {
       amountOut: d.amountOut,
       gas: d.gas,
       priceImpact: d.priceImpact ?? 0,
+      feeBps,
     });
   } catch (e) {
     console.error(e);

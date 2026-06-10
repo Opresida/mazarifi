@@ -183,7 +183,7 @@ export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: Netw
               value={gasTxt}
             />
             {entryCost > 0 && <CostRow label="Slippage (impacto no preço)" note="depende do valor — avisamos no projetor se for grande" value="variável" muted />}
-            <CostRow label="Taxa da Mazari Fi" note="grátis pra entrar; cobramos só ao sacar" value="0,5% no saque" muted />
+            <CostRow label="Taxa da Mazari Fi" note="taxa única na entrada; saída grátis" value="0,30% na entrada" muted />
           </div>
           <p className="mt-2.5 border-t border-gold/15 pt-2 text-[11px] leading-relaxed text-gold/80">
             Gás é fixo em dólar (uns centavos na Base) → pesa mais em valor pequeno. O projetor já soma <b>swap + gás</b> no "se paga em ~N dias".

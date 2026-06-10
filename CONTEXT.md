@@ -20,12 +20,18 @@ E desde a comparação com a Beefy, entendemos que o valor real não é só **in
 
 Todo token Nortoken nasce **medido on-chain** (o hook emite `SwapTracked` → volume/fees reais) e com **liquidez travada** (keeper = Mazari), que vira a ponte pra gestão automática (Fase 2). Hoje as pools Nortoken são **testnet (demo)**; viram reais quando o Nortoken escalar.
 
-## Ordem de build (decidida pelo Humberto)
+## Arquitetura de lançamento — Rota B (spec `docs/mazari-fi-spec.md`)
 
-1. **Fase 1 — Inteligência (read-only):** ranking honesto + custos + integridade. ✅ feito.
-1.5. **Imposto BR:** relatório de ganho de capital (GCAP, isenção R$35k/mês). ⏳
-2. **Fase 2 — Keeper (passivo Nortoken):** bot que rebalanceia o range (não saca). Resolve a gestão de range. ⏳
-3. **Fase 3 — Agregador / receita:** performance fee 8-10% sobre o rendimento; o zap é o primeiro pedaço. ⏳
+**Rota B (AGORA, não-custodial):** roteamos USDC pra **vaults gerenciados de terceiros** (Beefy-CLM/Gamma) via **Enso**. **O vault de terceiro cuida do range** (auto-rebalance) + auto-compound, e cobra a taxa dele (~9,5%, embutida no APY). **Sem contrato/keeper próprio pra pools externas** → sem auditoria, vai ao ar já. **A gestão de range é deles, não nossa.**
+**Rota A (depois, deferida):** cofres próprios (performance fee 8-10%) — precisa auditoria.
+> O **keeper** (`rebalance` do lock) é **só pras pools Nortoken** (nossa liquidez travada), NÃO pras externas.
+
+**Receita (spec §2):** 0,30% na entrada (Enso) · Pro (assinatura por tier de depósito) · 0,2% no swap de auto-switch (hook, só Pro) · rebates LiFi · slippage 50/50 declarado. Perf fee = Rota A.
+
+## Ordem de build
+1. **Fase 1 — Inteligência (read-only):** ranking honesto + custos + integridade. ✅
+2. **Zap Rota B (atual):** depositar/sacar via Enso (taxa **0,30% na entrada**, saída grátis). ✅
+3. **Imposto BR (1.5)** · **Pro tiers** · **seleção de gestora (Beefy/Gamma/Arrakis)** · **LiFi** · **Rota A**. ⏳
 
 ## Regras inegociáveis
 

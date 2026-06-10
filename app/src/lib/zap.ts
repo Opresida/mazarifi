@@ -17,6 +17,7 @@ export interface ZapQuote {
   amountOut?: string;
   gas?: string;
   priceImpact?: number; // basis points (93 = 0,93%)
+  feeBps?: number; // taxa Mazari na ENTRADA (30 = 0,30%; 0 se não configurada)
 }
 
 /** Pede ao nosso proxy a transação do zap (a chave Enso fica no servidor). */

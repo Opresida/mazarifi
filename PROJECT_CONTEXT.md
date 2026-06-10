@@ -36,10 +36,15 @@ Documento de contexto profundo (decisões, restrições, convenções) que **nã
 | 2 Keeper | Médio | rebalance NÃO saca; EOA→Safe+módulo antes da mainnet |
 | 3 Performance fee | Alto | parece gestão → gate jurídico |
 
-## Monetização (futuro)
+## Monetização (spec FINAL — `docs/mazari-fi-spec.md`)
 
-- Fase 1: grátis (funil). Pro (~US$10-15/mês via Stripe) **adiado** — cobrar por informação é prematuro.
-- Receita real = **performance fee 8-10% sobre o rendimento** (Fase 3) + zap fee. "Só ganhamos quando você ganha."
+Modelo travado. **Rota B** (vault de terceiro), camadas de receita:
+- **Entrada (Enso): 0,30% (30 bps), saída 0%.** ✅ ativa (`fee=30` + `feeReceiver=tesouro`). Recupera-se em ~11 dias + filtra capital mercenário. **Não** vender como "mais barato que a Beefy" (em Rota B o user paga a taxa da Beefy por baixo + a nossa por cima).
+- **Mazari Pro:** assinatura por **tier de depósito**; regra-mestra **preço ≤ 35% do lucro líquido anual** (`preço_mês = 0,35 × depósito × APY_líq / 12`). **APY líquido REAL (Beefy Base, verificado):** perf fee 9,5% uniforme; estáveis ~3-5%, blue-chip ~10-30% (volátil). Tiers ancoram no APY que o Humberto escolher (tabela não travada).
+- **Swap fee 0,2%** no auto-switch (hook, só Pro) · **Rebates LiFi** (bridging) · **Slippage positivo 50/50** declarado na tela.
+- **Performance fee 8-10% + harvest:** Rota A (deferida, precisa auditoria).
+- **Limite Rota B:** a taxa do vault de terceiro (~9,5%) é **intocável** (sem revenue-share público) — não implementar skim; mostrar com transparência.
+- Princípio: **honest DeFi — nenhuma taxa escondida** (tudo na tela, inclusive a do parceiro).
 
 ## Documentos canônicos (manter atualizados)
 

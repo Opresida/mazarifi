@@ -136,9 +136,15 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | nul
                 <ul className="mt-1.5 space-y-1">
                   <li>• Você deposita <b className="text-ftext">${amount} USDC</b> → entra na posição da pool{quote.lpSymbol ? ` (${quote.lpSymbol})` : ''}.</li>
                   <li>• A Enso troca metade e monta o par (1 transação, não-custodial).</li>
+                  {quote.feeBps ? (
+                    <li>• Taxa de entrada Mazari: <b className="text-gold">{(quote.feeBps / 100).toFixed(2)}%</b> (~${(amount * quote.feeBps / 10000).toFixed(2)}, uma vez) — <b className="text-ftext">saída grátis</b>.</li>
+                  ) : null}
                   <li className={highImpact ? 'text-rose' : ''}>• Impacto no preço: <b>~{impactPct?.toFixed(2)}%</b>{highImpact ? ' ⚠ alto pra essa pool — considere valor menor' : ''}.</li>
                   <li>• Gás de rede: <b>{gasUsd != null ? `~$${gasUsd.toFixed(3)}` : '—'}</b> (você paga na transação) · slippage máx 0,5%.</li>
                 </ul>
+                <p className="mt-2 text-[10px] leading-relaxed text-muted-2">
+                  <b className="text-ftext">Transparência total:</b> o rendimento mostrado já é <b>líquido</b> das taxas do protocolo (a fonte mostra o que sobra pro depositante). Se a posição for um vault gerenciado, a taxa do gestor (ex.: Beefy ~9,5% sobre o rendimento) também já está <b>embutida no APY</b>. Nada escondido.
+                </p>
                 <p className="mt-2 text-[10px] text-gold">⚠ Comece com pouco ($1–5) na primeira vez. Rendimento não é garantido.</p>
               </div>
               <button onClick={doDeposit} disabled={st === 'approving' || st === 'depositing'} className="mt-3 w-full rounded-xl bg-lime px-4 py-2.5 text-sm font-semibold text-ink hover:bg-lime-bright disabled:opacity-60">
