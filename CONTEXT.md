@@ -22,11 +22,11 @@ Todo token Nortoken nasce **medido on-chain** (o hook emite `SwapTracked` → vo
 
 ## Arquitetura de lançamento — Rota B (spec `docs/mazari-fi-spec.md`)
 
-**Rota B (AGORA, não-custodial):** roteamos USDC **direto** pro protocolo (Aave/Morpho/Aerodrome/etc.) via **Enso**. **Sem contrato/keeper próprio** → sem auditoria, vai ao ar já.
+**Rota B (AGORA, não-custodial):** roteamos USDC via **Enso** — **direto** no protocolo (Aave/Morpho/Aerodrome) OU num **vault GERENCIADO** (Beefy-CLM) que cuida do range. **Sem contrato/keeper próprio** → sem auditoria, vai ao ar já.
 **Rota A (depois, deferida):** cofres próprios (performance fee 8-10%) — precisa auditoria.
 > O **keeper** (`rebalance` do lock) é **só pras pools Nortoken** (nossa liquidez travada), NÃO pras externas.
 
-> ⚠️ **Seleção de gestora (§4) — INVESTIGADA e ENGAVETADA na Base (2026-06):** a ideia era rotear pra vault gerenciado (Beefy-CLM/Gamma) que cuida do range. **Achado ao vivo:** os **CLM da Beefy na Base são minúsculos** (maior ~$2,5k TVL → inviável); os **standard viáveis** (TVL≥$200k) são quase só **Morpho USDC**, que já roteamos **direto e melhor** (a Beefy só tira 9,5% à toa); **Enso não cobre Gamma/Arrakis**. Conclusão: **na Base o direto ganha do gerenciado** — não metemos intermediário que piora. **Gestão de range segue como gap honesto** (sinalizamos "concentrada/assume in-range"). Revisitar gestora só em **multi-chain** (Arbitrum/OP têm CLM com TVL real) ou na **Rota A**. `sources/beefy.ts` foi escrito e revertido (recriar fácil quando revisitar).
+> ✅ **Seleção de gestora (§4) — CONSTRUÍDA na Base (2026-06):** pools **GERENCIADAS Beefy-CLM** como 1ª classe (`sources/beefy.ts`, ~18). **Lição (Humberto pegou):** primeiro li a API errada (APY chave-base=0 vs `-vault`=10,3%; TVL do wrapper ~$2,5k vs do **pool** subjacente ~$1,6M+). Refeito certo: APY na chave `-vault`, liquidez = TVL do pool (DefiLlama match), curadoria estável+blue-chip+**major** (AERO/VELO/WELL; decisão Humberto), teto APY 150%. O **vault cuida do range** (resolve o gap), zap entra no `vaultAddress`, badge "⚙ Gerenciado" + "APY gerenciado (estimativa)" (não finge 15d realizado). **Gamma/Arrakis: Enso não cobre** (fora). Limite honesto: APY de CL é ruidoso → rotulado, nunca herói.
 
 **Receita (spec §2):** 0,30% na entrada (Enso) · Pro (assinatura por tier de depósito) · 0,2% no swap de auto-switch (hook, só Pro) · rebates LiFi · slippage 50/50 declarado. Perf fee = Rota A.
 
