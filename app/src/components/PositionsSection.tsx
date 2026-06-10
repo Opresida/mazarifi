@@ -138,7 +138,8 @@ function WithdrawCard({ position, address, net, onDone }: { position: Position; 
       ) : st === 'ready' || st === 'approving' || st === 'withdrawing' ? (
         <>
           <p className="mt-2 rounded-lg border border-edge bg-ink/40 p-2.5 text-[11px] leading-relaxed text-muted">
-            Sacar tudo → recebe <b className="text-ftext">~${outUsd?.toFixed(2)} USDC</b>. Impacto ~{impactPct?.toFixed(2)}% · gás {gasUsd != null ? `~$${gasUsd.toFixed(3)}` : '—'} · não-custodial.
+            Sacar tudo → recebe <b className="text-ftext">~${outUsd?.toFixed(2)} USDC</b> (já líquido). Impacto ~{impactPct?.toFixed(2)}% · gás {gasUsd != null ? `~$${gasUsd.toFixed(3)}` : '—'}
+            {quote?.feeBps ? <> · <span className="text-gold">taxa Mazari {(quote.feeBps / 100).toFixed(2)}%</span></> : null} · não-custodial.
           </p>
           <button onClick={doWithdraw} disabled={st === 'approving' || st === 'withdrawing'} className="mt-2 w-full rounded-xl bg-lime px-4 py-2 text-sm font-semibold text-ink hover:bg-lime-bright disabled:opacity-60">
             {st === 'approving' ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Aprovando…</span>

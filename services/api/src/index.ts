@@ -14,6 +14,7 @@ app.get('/api/pools', async (_req, res) => {
   try {
     const rows = await sql`
       SELECT * FROM pools
+      WHERE (lower(project) ~ ${ZAPPABLE_RE} OR source = 'nortoken')
       ORDER BY risk_score DESC NULLS LAST, COALESCE(net_annual_15d, apy_base, 0) DESC`;
     res.json(rows);
   } catch (e) {
@@ -48,13 +49,13 @@ app.get('/api/best', async (_req, res) => {
     const [lending] = await sql`
       SELECT * FROM pools
       WHERE return_15d IS NOT NULL AND return_15d > 0 AND risk_score >= 65
-        AND exposure = 'single' AND COALESCE(tvl_usd, 0) >= ${MIN_TVL}
+        AND exposure = 'single' AND COALESCE(tvl_usd, 0) >= ${MIN_TVL} AND lower(project) ~ ${ZAPPABLE_RE}
       ORDER BY (CASE WHEN vol_low > 0 AND vol_high <= vol_low * 3 THEN 0 ELSE 1 END), net_annual_15d DESC
       LIMIT 1`;
     const [trade] = await sql`
       SELECT * FROM pools
       WHERE return_15d IS NOT NULL AND return_15d > 0 AND risk_score >= 60
-        AND exposure = 'multi' AND COALESCE(tvl_usd, 0) >= ${MIN_TVL}
+        AND exposure = 'multi' AND COALESCE(tvl_usd, 0) >= ${MIN_TVL} AND lower(project) ~ ${ZAPPABLE_RE}
       ORDER BY (CASE WHEN vol_low > 0 AND vol_high <= vol_low * 3 THEN 0 ELSE 1 END), net_annual_15d DESC
       LIMIT 1`;
     res.json({ lending: lending ?? null, trade: trade ?? null });
@@ -91,6 +92,10 @@ const ENSO = 'https://api.enso.finance/api/v1';
 const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const BASE_RPC = process.env.BASE_RPC || 'https://mainnet.base.org';
 const ensoHeaders = () => ({ Authorization: `Bearer ${process.env.ENSO_API_KEY}` });
+
+// Receita: taxa da Mazari (integrador Enso) — SÓ NO SAQUE. Sem MAZARI_TREASURY, fica sem taxa (graceful).
+const ZAP_FEE_BPS = process.env.ZAP_FEE_BPS || '50'; // 50 bps = 0,5%
+const MAZARI_TREASURY = process.env.MAZARI_TREASURY; // endereço que recebe a taxa
 
 /** Lê allowance de um ERC20 (server-side, RPC confiável — evita a RPC instável da carteira). token=USDC por padrão. */
 app.get('/api/zap/allowance', async (req, res) => {
@@ -158,10 +163,16 @@ app.get('/api/zap/withdraw', async (req, res) => {
     const slippageBps = Number(req.query.slippageBps) || 50;
     if (!/^0x[0-9a-fA-F]{40}$/.test(token) || !amount || !fromAddress) return res.status(400).json({ error: 'parâmetros faltando' });
     const rq = new URLSearchParams({ chainId: '8453', fromAddress, receiver: fromAddress, amountIn: amount, tokenIn: token, tokenOut: USDC_BASE, routingStrategy: 'router', slippage: String(slippageBps) });
+    // Taxa da Mazari no saque (Enso desconta do amountOut e manda pro tesouro). Sem treasury → sem taxa.
+    const feeBps = MAZARI_TREASURY ? Number(ZAP_FEE_BPS) : 0;
+    if (MAZARI_TREASURY) {
+      rq.set('fee', ZAP_FEE_BPS);
+      rq.set('feeReceiver', MAZARI_TREASURY);
+    }
     const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
     if (!rr.ok) return res.json({ supported: false, reason: `Enso route ${rr.status}` });
     const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
-    res.json({ supported: true, to: d.tx?.to, data: d.tx?.data, value: d.tx?.value ?? '0', spender: d.tx?.to, amountOut: d.amountOut, gas: d.gas, priceImpact: d.priceImpact ?? 0 });
+    res.json({ supported: true, to: d.tx?.to, data: d.tx?.data, value: d.tx?.value ?? '0', spender: d.tx?.to, amountOut: d.amountOut, gas: d.gas, priceImpact: d.priceImpact ?? 0, feeBps });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });
@@ -172,12 +183,22 @@ function ensoSlug(project: string): string | null {
   const p = project.toLowerCase();
   if (p.includes('aerodrome')) return 'aerodrome';
   if (p.includes('uniswap-v3') || p.includes('uniswap-v4')) return 'uniswap-v3';
-  if (p.includes('morpho')) return 'morpho-blue-vaults';
-  if (p.includes('curve')) return 'curve-dex';
-  if (p.includes('balancer')) return 'balancer-v2';
   if (p.includes('uniswap-v2') || p.includes('sushiswap')) return 'uniswap-v2';
+  if (p.includes('morpho') || p.includes('gauntlet')) return 'morpho-blue-vaults'; // gauntlet = curador Morpho
+  if (p.includes('curve')) return 'curve-dex';
+  if (p.includes('balancer-v3')) return 'balancer-v3';
+  if (p.includes('balancer')) return 'balancer-v2';
+  if (p.includes('aave')) return 'aave-v3';
+  if (p.includes('spark')) return 'spark-lend';
+  if (p.includes('moonwell')) return 'moonwell';
+  if (p.includes('fluid')) return 'fluid-lending';
+  if (p.includes('compound')) return 'compound-v3';
+  if (p.includes('pendle')) return 'pendle-markets';
   return null;
 }
+
+// Projetos que conseguimos ZAPAR (executar/monetizar) — sincronizado com ensoSlug. Usado pra esconder o resto do ranking.
+const ZAPPABLE_RE = 'aerodrome|uniswap|sushiswap|morpho|gauntlet|curve|balancer|aave|spark|moonwell|fluid|compound|pendle';
 
 app.get('/api/zap/quote', async (req, res) => {
   try {

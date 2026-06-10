@@ -68,9 +68,10 @@ export interface WithdrawQuote {
   data?: string;
   value?: string;
   spender?: string;
-  amountOut?: string; // USDC base units (6)
+  amountOut?: string; // USDC base units (6) — JÁ líquido da taxa Mazari
   gas?: string;
   priceImpact?: number;
+  feeBps?: number; // taxa da Mazari no saque (0 se não configurada)
 }
 
 /** Saque: monta a tx "posição → USDC" (Enso). */
