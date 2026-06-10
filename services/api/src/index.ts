@@ -12,9 +12,11 @@ app.use(cors());
 /** Ranking honesto — CEGO À ORIGEM: ordena por risco, depois rendimento. `source` NÃO interfere. */
 app.get('/api/pools', async (_req, res) => {
   try {
+    // DOUTRINA DO PRODUTO: só listamos onde AGREGAMOS valor — empréstimo (parking seguro, sem IL) OU
+    // gerenciada (cuidamos do range). Fora: LP/CL CRU (troca/concentrada direta) = exposição sem gestão = "Uniswap com pedágio".
     const rows = await sql`
       SELECT * FROM pools
-      WHERE (lower(project) ~ ${ZAPPABLE_RE} OR source = 'nortoken')
+      WHERE ((lower(project) ~ ${ZAPPABLE_RE} AND (exposure = 'single' OR raw->>'managed' = 'true')) OR source = 'nortoken')
       ORDER BY risk_score DESC NULLS LAST, COALESCE(net_annual_15d, apy_base, 0) DESC`;
     res.json(rows);
   } catch (e) {
@@ -55,7 +57,7 @@ app.get('/api/best', async (_req, res) => {
     const [trade] = await sql`
       SELECT * FROM pools
       WHERE return_15d IS NOT NULL AND return_15d > 0 AND risk_score >= 60
-        AND exposure = 'multi' AND COALESCE(tvl_usd, 0) >= ${MIN_TVL} AND lower(project) ~ ${ZAPPABLE_RE}
+        AND raw->>'managed' = 'true' AND COALESCE(tvl_usd, 0) >= ${MIN_TVL} AND lower(project) ~ ${ZAPPABLE_RE}
       ORDER BY (CASE WHEN vol_low > 0 AND vol_high <= vol_low * 3 THEN 0 ELSE 1 END), net_annual_15d DESC
       LIMIT 1`;
     res.json({ lending: lending ?? null, trade: trade ?? null });

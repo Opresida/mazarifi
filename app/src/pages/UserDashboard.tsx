@@ -168,10 +168,10 @@ export function UserDashboard() {
 function HighlightCard({ kind, pool, loading, onOpen }: { kind: 'lending' | 'trade'; pool: Pool | null; loading: boolean; onOpen: (p: Pool) => void }) {
   const isLending = kind === 'lending';
   const Icon = isLending ? Landmark : Repeat;
-  const title = isLending ? 'Melhor empréstimo' : 'Melhor pool de troca';
+  const title = isLending ? 'Melhor empréstimo' : 'Melhor gerenciada';
   const explain = isLending
-    ? 'Você empresta uma moeda e recebe juros. Mais simples e seguro — sem custo de entrada.'
-    : 'Você entra num par e ganha comissão das trocas. Rende mais, mas tem custo de entrada e pode variar.';
+    ? 'Você empresta uma moeda e recebe juros. Mais simples e seguro — sem risco de variação.'
+    : 'Pool em que a gestão automática cuida do range pra você. Rende mais; o número estima e pode variar.';
   const entry = pool ? poolEntryCostPct(pool) : 0;
   return (
     <div className={`relative overflow-hidden rounded-3xl border p-6 ${isLending ? 'glow-lime border-lime/30 bg-card/80' : 'border-gold/30 bg-card/80'}`}>
