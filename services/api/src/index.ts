@@ -269,6 +269,55 @@ app.get('/api/pool/:key', async (req, res) => {
   }
 });
 
+/** Histórico da pool (estilo Beefy): rendimento + TVL (DefiLlama /chart) + preço do par (ratio dos 2 tokens). */
+app.get('/api/pool/:key/chart', async (req, res) => {
+  try {
+    const key = req.params.key;
+    const [pool] = await sql`SELECT raw FROM pools WHERE pool_key = ${key} LIMIT 1`;
+    if (!pool) return res.json({ apy: [], tvl: [] });
+
+    const apy: Array<{ t: number; v: number }> = [];
+    const tvl: Array<{ t: number; v: number }> = [];
+    const id = key.startsWith('external:') ? key.slice('external:'.length) : null;
+    if (id) {
+      const r = await fetch(`https://yields.llama.fi/chart/${id}`);
+      if (r.ok) {
+        const j = (await r.json()) as { data?: Array<{ timestamp: string; tvlUsd?: number | null; apy?: number | null; apyBase?: number | null }> };
+        for (const d of (j.data ?? []).slice(-30)) {
+          const t = new Date(d.timestamp).getTime();
+          if (d.tvlUsd != null) tvl.push({ t, v: d.tvlUsd });
+          const a = d.apyBase ?? d.apy;
+          if (a != null) apy.push({ t, v: a });
+        }
+      }
+    }
+
+    // Preço do par (Position Price): ratio token0/token1 do histórico de preço (coins).
+    let price: Array<{ t: number; v: number }> | undefined;
+    const underlying = (pool.raw?.underlyingTokens ?? []) as string[];
+    if (underlying.length === 2 && underlying[0].toLowerCase() !== underlying[1].toLowerCase()) {
+      const a0 = `base:${underlying[0].toLowerCase()}`;
+      const a1 = `base:${underlying[1].toLowerCase()}`;
+      const r = await fetch(`https://coins.llama.fi/chart/${a0},${a1}?span=30&period=1d`);
+      if (r.ok) {
+        const j = (await r.json()) as { coins?: Record<string, { prices?: Array<{ timestamp: number; price: number }> }> };
+        const c0 = j.coins?.[a0]?.prices ?? [];
+        const c1 = new Map((j.coins?.[a1]?.prices ?? []).map((p) => [Math.round(p.timestamp / 86400), p.price]));
+        const series: Array<{ t: number; v: number }> = [];
+        for (const p of c0) {
+          const p1 = c1.get(Math.round(p.timestamp / 86400));
+          if (p1 && p1 > 0 && p.price > 0) series.push({ t: p.timestamp * 1000, v: p.price / p1 });
+        }
+        if (series.length >= 3) price = series;
+      }
+    }
+    res.json({ price, apy, tvl });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
 /** Estado da rede: gás AO VIVO da Base + preço do ETH (1 linha). */
 app.get('/api/network', async (_req, res) => {
   try {

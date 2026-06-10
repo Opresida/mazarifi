@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useRoute } from 'wouter';
-import { Compass, Wallet, ArrowLeft, ExternalLink, CheckCircle2, AlertTriangle, MinusCircle, ArrowRight } from 'lucide-react';
+import { Compass, Wallet, ArrowLeft, CheckCircle2, AlertTriangle, MinusCircle, ArrowRight } from 'lucide-react';
 import type { Pool, NetworkInfo } from '../types';
 import { fetchPool, fetchPools, fetchNetwork } from '../api';
 import { Shell, type NavItem } from '../components/Shell';
 import { Card } from '../components/atoms';
 import { PoolDetailContent } from '../components/PoolDetail';
 import { DepositPanel } from '../components/DepositPanel';
+import { PoolChart } from '../components/PoolChart';
 import { WalletButton } from '../components/WalletButton';
 import { buildChecklist, type CheckItem } from '../lib/checklist';
 import { bestAlternative, migrationAdvice } from '../lib/migration';
@@ -17,26 +18,6 @@ const NAV: NavItem[] = [
   { path: '/dashboard', label: 'Oportunidades', icon: Compass },
   { path: '/minhas-aplicacoes', label: 'Minha aplicação', icon: Wallet },
 ];
-
-const PROTOCOL_URL: Record<string, string> = {
-  aerodrome: 'https://aerodrome.finance/',
-  uniswap: 'https://app.uniswap.org/',
-  aave: 'https://app.aave.com/',
-  morpho: 'https://app.morpho.org/',
-  curve: 'https://curve.fi/',
-  balancer: 'https://balancer.fi/pools',
-  pendle: 'https://app.pendle.finance/',
-  compound: 'https://app.compound.finance/',
-  moonwell: 'https://moonwell.fi/',
-  spark: 'https://app.spark.fi/',
-  fluid: 'https://fluid.io/',
-  sushiswap: 'https://www.sushi.com/pool',
-};
-function protocolUrl(project: string): string | null {
-  const p = project.toLowerCase();
-  for (const k of Object.keys(PROTOCOL_URL)) if (p.includes(k)) return PROTOCOL_URL[k];
-  return null;
-}
 
 export function PoolPage() {
   const [, params] = useRoute('/pool/:key');
@@ -73,13 +54,13 @@ export function PoolPage() {
           <h1 className="mt-3 font-display text-2xl font-bold text-ftext">{poolName(pool)}</h1>
           <p className="mt-0.5 text-sm text-muted">{pool.project} · {pool.chain}</p>
           <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
-            <div className="min-w-0">
+            <div className="min-w-0 space-y-4">
               <PoolDetailContent pool={pool} net={net} />
+              <PoolChart poolKey={pool.pool_key} isPair={pool.exposure === 'multi'} />
               <ChecklistCard pool={pool} />
             </div>
             <div className="space-y-4">
               {pool.source !== 'nortoken' && <DepositPanel pool={pool} net={net} />}
-              <HowToEnterCard pool={pool} />
               <MigrationCard pool={pool} all={all} net={net} />
             </div>
           </div>
@@ -118,37 +99,6 @@ function ChecklistCard({ pool }: { pool: Pool }) {
       <p className="mt-3 border-t border-edge-soft pt-2 text-[10px] leading-relaxed text-muted-2">
         Passar nessas checagens <b>não garante</b> segurança total — ajuda na sua análise. "Pendente" = ainda não checamos automaticamente (não fingimos que checamos).
       </p>
-    </Card>
-  );
-}
-
-function HowToEnterCard({ pool }: { pool: Pool }) {
-  const url = protocolUrl(pool.project);
-  const isNT = pool.source === 'nortoken';
-  return (
-    <Card className="p-4">
-      <p className="text-sm font-semibold text-ftext">Prefere entrar manualmente?</p>
-      {isNT ? (
-        <p className="mt-2 text-xs leading-relaxed text-muted">Pool Nortoken (testnet/demo) — entrada pela Mazari Fi chega na próxima fase.</p>
-      ) : (
-        <>
-          <ol className="mt-2 space-y-1.5 text-xs leading-relaxed text-muted">
-            <li><b className="text-ftext">1.</b> Conecte sua carteira no app da {pool.project}.</li>
-            <li><b className="text-ftext">2.</b> Procure a oportunidade <b className="text-ftext">{poolName(pool)}</b>.</li>
-            <li><b className="text-ftext">3.</b> Deposite e confirme — lembrando do custo de entrada que mostramos acima.</li>
-          </ol>
-          {url && (
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-edge px-4 py-2 text-sm font-semibold text-ftext hover:border-lime/30"
-            >
-              Abrir {pool.project} <ExternalLink size={15} />
-            </a>
-          )}
-        </>
-      )}
     </Card>
   );
 }

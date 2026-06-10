@@ -18,6 +18,18 @@ export interface RewardIntegrity {
   reasons: string[];
 }
 
+/** Ponto de série temporal (t = ms, v = valor). */
+export interface ChartPoint {
+  t: number;
+  v: number;
+}
+/** Histórico da pool: preço do par (ratio), rendimento (apy) e TVL. */
+export interface PoolChartData {
+  price?: ChartPoint[];
+  apy: ChartPoint[];
+  tvl: ChartPoint[];
+}
+
 /** Posição DeFi do usuário (LP/vault que ele tem na carteira). */
 export interface Position {
   token: string;

@@ -19,7 +19,7 @@
 - **Lockup / carência de saída:** alguns protocolos seguram o saque — sinalizar quando o dado existir.
 
 ## ⏭️ DEFERIDO (com razão clara)
-- **Fee da Mazari** (receita da execução): **$0 no depósito · 0,5% no saque** — taxa de integrador via **Enso** (descontada do que você recebe, vai pro tesouro Mazari), mostrada na confirmação do saque. Você pode entrar/sair **manual de graça** (handoff). Performance fee sobre o rendimento = Fase 3.
+- **Fee da Mazari** (receita da execução): **$0 no depósito · 0,5% no saque** — taxa de integrador via **Enso** (descontada do que você recebe, vai pro tesouro Mazari), mostrada na confirmação do saque. Performance fee sobre o rendimento = Fase 3.
 - **Fees de vault parceiro** (Beefy/Yearn/40-acres/yo-protocol): o `apyBase` do DefiLlama normalmente **já é líquido** das fees do vault (rendimento ao depositante). Anotado; se algum vier bruto, descontar.
 - **Imposto (GCAP BR):** Fase 1.5 — módulo `core/tax-br` (isenção R$35k/mês, Grupo 08), relatório AUXILIAR + disclaimer.
 - **Bridge pra Base:** assumimos fundos **já na Base**. Custo de bridge fica fora (nota).
