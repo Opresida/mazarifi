@@ -4,7 +4,7 @@ import { Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, ArrowR
 import type { Pool, NetworkMap } from '../types';
 import { useWallet, switchToChain, sendTx } from '../lib/wallet';
 import { quoteZap, usdcAllowance, approveUsdc, type ZapQuote } from '../lib/zap';
-import { fetchUsdcBalances, quoteBridge, type BridgeQuote } from '../lib/bridge';
+import { fetchUsdcBalances, quoteCrossDeposit, type CrossDepositQuote } from '../lib/bridge';
 import { managedInfo } from '../lib/pool';
 import { chainCfg } from '../lib/chains';
 import { Card } from './atoms';
@@ -137,7 +137,7 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
 
           {st !== 'ready' && st !== 'approving' && st !== 'depositing' && (
             needsBridge && srcChain ? (
-              <BridgeCard fromChain={srcChain} toChain={pool.chain} amount={amount} srcBal={srcBal} address={address!} onBridged={loadBalances} />
+              <BridgeCard poolKey={pool.pool_key} fromChain={srcChain} toChain={pool.chain} amount={amount} srcBal={srcBal} address={address!} onBridged={loadBalances} />
             ) : (
               <button onClick={doQuote} disabled={st === 'quoting' || !(amount > 0)} className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 px-4 py-2.5 text-sm font-semibold text-lime hover:bg-lime/15 disabled:opacity-60">
                 {st === 'quoting' ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Simulando…</span> : 'Simular depósito'}
@@ -191,20 +191,19 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
 
 type BSt = 'idle' | 'quoting' | 'ready' | 'approving' | 'bridging' | 'done';
 
-/** Ponte automática: a gente achou o USDC do usuário em outra rede e traz pra rede da pool (LiFi, melhor rota). */
-function BridgeCard({ fromChain, toChain, amount, srcBal, address, onBridged }: { fromChain: string; toChain: string; amount: number; srcBal: number; address: string; onBridged: () => void }) {
+/** 1 CLIQUE cross-chain: a gente achou o USDC em outra rede e, num clique só, faz a ponte E investe no vault (LiFi + Enso no destino). */
+function BridgeCard({ poolKey, fromChain, toChain, amount, srcBal, address, onBridged }: { poolKey: string; fromChain: string; toChain: string; amount: number; srcBal: number; address: string; onBridged: () => void }) {
   const [bst, setBst] = useState<BSt>('idle');
-  const [bq, setBq] = useState<BridgeQuote | null>(null);
+  const [bq, setBq] = useState<CrossDepositQuote | null>(null);
   const [berr, setBerr] = useState<string | null>(null);
   const amt = Math.min(amount, srcBal);
-  const outUsd = bq?.toAmount ? Number(bq.toAmount) / 1e6 : null;
 
   async function doQuote() {
     setBerr(null);
     setBst('quoting');
     try {
-      const q = await quoteBridge(fromChain, toChain, address, amt);
-      if (!q.supported) { setBerr(`Ponte indisponível (${q.reason}).`); setBst('idle'); return; }
+      const q = await quoteCrossDeposit(poolKey, fromChain, amt, address);
+      if (!q.supported) { setBerr(`Indisponível em 1 clique (${q.reason}).`); setBst('idle'); return; }
       setBq(q);
       setBst('ready');
     } catch (e) {
@@ -213,7 +212,7 @@ function BridgeCard({ fromChain, toChain, amount, srcBal, address, onBridged }: 
     }
   }
 
-  async function doBridge() {
+  async function doDeposit() {
     if (!bq?.to || !bq.data || !bq.spender) return;
     setBerr(null);
     try {
@@ -232,10 +231,10 @@ function BridgeCard({ fromChain, toChain, amount, srcBal, address, onBridged }: 
       setBst('bridging');
       await sendTx({ to: bq.to, data: bq.data, value: bq.value });
       setBst('done');
-      setTimeout(onBridged, 12000); // ponte é rápida (~10s) → recarrega o saldo e libera o depósito
+      setTimeout(onBridged, 35000); // ~30s pro USDC atravessar e entrar no vault no destino
     } catch (e) {
       const code = (e as { code?: number })?.code;
-      setBerr(code === 4001 ? 'Você cancelou.' : (e as Error)?.message ?? 'erro na ponte');
+      setBerr(code === 4001 ? 'Você cancelou.' : (e as Error)?.message ?? 'erro na transação');
       setBst('ready');
     }
   }
@@ -243,23 +242,24 @@ function BridgeCard({ fromChain, toChain, amount, srcBal, address, onBridged }: 
   return (
     <div className="mt-3 rounded-xl border border-lime/30 bg-lime/5 p-3 text-[11px] leading-relaxed text-muted">
       {bst === 'done' ? (
-        <p className="text-lime">✅ <b>USDC a caminho da {toChain}</b> (~{bq?.durationS ?? 10}s). Já já o depósito libera — atualizando…</p>
+        <p className="text-lime">✅ <b>Em ~{bq?.durationS ?? 30}s seu USDC entra direto no vault da {toChain}</b> — 1 assinatura, mais nada. Acompanhe em "Minhas aplicações".</p>
       ) : (
         <>
-          <p>💡 <b className="text-ftext">Seu USDC está na {fromChain}</b> (${srcBal.toFixed(2)}). A gente traz pra <b className="text-ftext">{toChain}</b> pra você — a melhor rota, sem você fazer nada.</p>
+          <p>💡 <b className="text-ftext">Seu USDC está na {fromChain}</b> (${srcBal.toFixed(2)}). A gente traz pra <b className="text-ftext">{toChain}</b> <b className="text-ftext">e investe no vault — tudo num clique só.</b></p>
           {bq && (
-            <p className="mt-1.5">Traz <b className="text-ftext">${amt.toFixed(2)}</b> → recebe ~<b className="text-ftext">${outUsd?.toFixed(2)}</b> na {toChain} · ~{bq.durationS ?? 10}s{bq.feePct ? ` · taxa Mazari ${bq.feePct.toFixed(2)}%` : ''} <span className="text-muted-2">(via {bq.tool})</span>.</p>
+            <p className="mt-1.5">Investe ~<b className="text-ftext">${bq.depositUsd?.toFixed(2)}</b> no vault da {toChain} · ~{bq.durationS ?? 30}s{bq.feePct ? ` · taxa Mazari ${bq.feePct.toFixed(2)}%` : ''} <span className="text-muted-2">(via {bq.tool})</span>.</p>
           )}
           <button
-            onClick={bst === 'ready' ? doBridge : doQuote}
+            onClick={bst === 'ready' ? doDeposit : doQuote}
             disabled={bst === 'quoting' || bst === 'approving' || bst === 'bridging'}
             className="mt-2 w-full rounded-lg bg-lime px-3 py-2 text-xs font-semibold text-ink hover:bg-lime-bright disabled:opacity-60"
           >
-            {bst === 'quoting' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Calculando a melhor rota…</span>
+            {bst === 'quoting' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Montando a melhor rota…</span>
               : bst === 'approving' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Aprovando USDC…</span>
-              : bst === 'bridging' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Confirme a ponte na carteira…</span>
-              : bst === 'ready' ? `Trazer $${amt.toFixed(2)} pra ${toChain}` : `Trazer USDC pra ${toChain}`}
+              : bst === 'bridging' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Confirme na carteira…</span>
+              : bst === 'ready' ? `Depositar $${amt.toFixed(2)} com 1 clique` : `Depositar com 1 clique (trazendo da ${fromChain})`}
           </button>
+          <p className="mt-1.5 text-[10px] text-muted-2">Se a rede variar muito, seu USDC chega na {toChain} e você finaliza o depósito normal — nada se perde.</p>
           {berr && <p className="mt-1.5 text-rose">{berr}</p>}
         </>
       )}

@@ -30,3 +30,25 @@ export async function quoteBridge(fromChain: string, toChain: string, fromAddres
   if (!r.ok) return { supported: false, reason: `erro ${r.status}` };
   return r.json();
 }
+
+/** Depósito cross-chain em 1 ASSINATURA: a LiFi faz a ponte E investe no vault do destino. */
+export interface CrossDepositQuote {
+  supported: boolean;
+  reason?: string;
+  to?: string;
+  data?: string;
+  value?: string;
+  spender?: string;
+  durationS?: number | null;
+  tool?: string | null;
+  depositUsd?: number; // USDC que entra no vault no destino
+  vaultSymbol?: string | null;
+  feePct?: number; // rebate Mazari da ponte (0 se não configurado)
+}
+
+export async function quoteCrossDeposit(poolKey: string, fromChain: string, amountUsdc: number, fromAddress: string): Promise<CrossDepositQuote> {
+  const q = new URLSearchParams({ poolKey, fromChain, amountUsdc: String(amountUsdc), fromAddress });
+  const r = await fetch(`/api/bridge/deposit-quote?${q.toString()}`);
+  if (!r.ok) return { supported: false, reason: `erro ${r.status}` };
+  return r.json();
+}

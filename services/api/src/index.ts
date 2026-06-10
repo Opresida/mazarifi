@@ -207,6 +207,66 @@ app.get('/api/bridge/quote', async (req, res) => {
   }
 });
 
+/** DEPÓSITO CROSS-CHAIN em 1 ASSINATURA: a LiFi faz a ponte E executa o zap do Enso no vault do destino. */
+app.get('/api/bridge/deposit-quote', async (req, res) => {
+  try {
+    if (process.env.ZAP_ENABLED !== 'true' || !process.env.ENSO_API_KEY) return res.json({ supported: false, reason: 'zap desativado' });
+    const poolKey = String(req.query.poolKey ?? '');
+    const fromAddress = String(req.query.fromAddress ?? '');
+    const amountUsdc = Number(req.query.amountUsdc ?? 0);
+    if (!poolKey || !/^0x[0-9a-fA-F]{40}$/.test(fromAddress) || !(amountUsdc > 0)) return res.status(400).json({ error: 'parâmetros faltando' });
+
+    const [pool] = await sql`SELECT project, chain, raw FROM pools WHERE pool_key = ${poolKey} LIMIT 1`;
+    if (!pool) return res.json({ supported: false, reason: 'pool não encontrada' });
+    const toCfg = chainOf(pool.chain);
+    const fromCfg = chainOf(req.query.fromChain);
+    if (fromCfg.name === toCfg.name) return res.json({ supported: false, reason: 'mesma rede' });
+
+    // 1) cota a ponte só pra saber QUANTO USDC chega no destino (a saída da LiFi é confiável; a do contractCall não).
+    const amount = BigInt(Math.floor(amountUsdc * 1e6)).toString();
+    const bq = new URLSearchParams({ fromChain: String(fromCfg.chainId), toChain: String(toCfg.chainId), fromToken: fromCfg.usdc, toToken: toCfg.usdc, fromAddress, fromAmount: amount });
+    if (LIFI_INTEGRATOR) { bq.set('integrator', LIFI_INTEGRATOR); bq.set('fee', LIFI_FEE); }
+    const br = await fetch(`${LIFI}/quote?${bq.toString()}`);
+    if (!br.ok) return res.json({ supported: false, reason: `LiFi ${br.status}` });
+    const bd = (await br.json()) as { estimate?: { toAmount?: string } };
+    const delivered = BigInt(bd.estimate?.toAmount ?? '0');
+    if (delivered <= 0n) return res.json({ supported: false, reason: 'ponte sem rota' });
+
+    // 2) calldata do zap Enso no destino, p/ um pouco ABAIXO do entregue (folga → não reverte por falta de saldo).
+    const destAmount = ((delivered * 998n) / 1000n).toString();
+    const z = await buildEnsoZap(pool as { project: string; raw: EnsoRaw }, toCfg, destAmount, fromAddress);
+    if ('error' in z) return res.json({ supported: false, reason: z.error });
+
+    // 3) LiFi contractCalls: ponte + executa o zap Enso no destino → 1 tx assinável na origem.
+    const body = {
+      fromChain: String(fromCfg.chainId), fromToken: fromCfg.usdc, fromAddress,
+      toChain: String(toCfg.chainId), toToken: toCfg.usdc, toAmount: destAmount,
+      ...(LIFI_INTEGRATOR ? { integrator: LIFI_INTEGRATOR, fee: LIFI_FEE } : {}),
+      contractCalls: [{ fromAmount: destAmount, fromTokenAddress: toCfg.usdc, toContractAddress: z.to, toContractCallData: z.data, toContractGasLimit: '950000' }],
+    };
+    const cr = await fetch(`${LIFI}/quote/contractCalls`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!cr.ok) return res.json({ supported: false, reason: `LiFi contractCalls ${cr.status}` });
+    const cd = (await cr.json()) as { transactionRequest?: { to?: string; data?: string; value?: string }; estimate?: { approvalAddress?: string; executionDuration?: number }; tool?: string };
+    const tx = cd.transactionRequest;
+    if (!tx?.to || !tx.data) return res.json({ supported: false, reason: 'sem rota cross-deposit' });
+    res.json({
+      supported: true,
+      to: tx.to,
+      data: tx.data,
+      value: tx.value ?? '0',
+      spender: cd.estimate?.approvalAddress ?? tx.to,
+      durationS: cd.estimate?.executionDuration ?? null,
+      tool: cd.tool ?? null,
+      depositUsd: Number(destAmount) / 1e6,
+      vaultSymbol: z.lpSymbol,
+      feePct: LIFI_INTEGRATOR ? Number(LIFI_FEE) * 100 : 0,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
 /** "Minhas posições": lê a carteira (Enso) e filtra as POSIÇÕES DeFi (LP/vault) com valor. */
 app.get('/api/positions', async (req, res) => {
   try {
@@ -293,6 +353,56 @@ function ensoSlug(project: string): string | null {
 // Projetos que conseguimos ZAPAR (executar/monetizar) — sincronizado com ensoSlug. Usado pra esconder o resto do ranking.
 const ZAPPABLE_RE = 'aerodrome|uniswap|sushiswap|morpho|gauntlet|curve|balancer|aave|spark|moonwell|fluid|compound|pendle|beefy';
 
+type EnsoZap = { to: string; data: string; value: string; spender: string; amountOut?: string; gas?: string; priceImpact?: number; lpTarget: string; lpSymbol: string | null; feeBps: number };
+type EnsoRaw = { vaultAddress?: string; assets?: string[]; underlyingTokens?: string[] } | null;
+
+/** Resolve o LP/vault alvo + monta a rota Enso (USDC da chain → posição) com a taxa Mazari 0,30%.
+ *  `amountBase` = USDC em 6 casas (string); `receiver` = quem recebe a posição. Reusado pelo zap e pelo cross-deposit. */
+async function buildEnsoZap(
+  pool: { project: string; raw: EnsoRaw },
+  cfg: ReturnType<typeof chainOf>,
+  amountBase: string,
+  receiver: string,
+  slippageBps = 50,
+): Promise<EnsoZap | { error: string }> {
+  let lp: { address: string; symbol?: string | null } | undefined;
+  const managedVault = pool.raw?.vaultAddress;
+  if (managedVault) {
+    lp = { address: managedVault, symbol: pool.raw?.assets?.join('/') ?? null };
+  } else {
+    const slug = ensoSlug(pool.project);
+    const underlying = pool.raw?.underlyingTokens ?? [];
+    if (!slug || underlying.length === 0) return { error: 'protocolo sem zap' };
+    const tq = new URLSearchParams({ chainId: String(cfg.chainId), protocolSlug: slug, page: '1' });
+    for (const u of underlying) tq.append('underlyingTokens', u);
+    const tr = await fetch(`${ENSO}/tokens?${tq.toString()}`, { headers: ensoHeaders() });
+    const tj = (await tr.json()) as { data?: Array<{ address: string; symbol?: string | null }> };
+    lp = tj.data?.[0];
+  }
+  if (!lp?.address) return { error: 'posição não encontrada no Enso' };
+
+  const rq = new URLSearchParams({
+    chainId: String(cfg.chainId),
+    fromAddress: receiver,
+    receiver,
+    amountIn: amountBase,
+    tokenIn: cfg.usdc,
+    tokenOut: lp.address,
+    routingStrategy: 'router',
+    slippage: String(slippageBps),
+  });
+  const feeBps = MAZARI_TREASURY ? Number(ZAP_FEE_BPS) : 0;
+  if (MAZARI_TREASURY) {
+    rq.set('fee', ZAP_FEE_BPS);
+    rq.set('feeReceiver', MAZARI_TREASURY);
+  }
+  const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
+  if (!rr.ok) return { error: `Enso route ${rr.status}` };
+  const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
+  if (!d.tx?.to || !d.tx.data) return { error: 'Enso sem tx' };
+  return { to: d.tx.to, data: d.tx.data, value: d.tx.value ?? '0', spender: d.tx.to, amountOut: d.amountOut, gas: d.gas, priceImpact: d.priceImpact ?? 0, lpTarget: lp.address, lpSymbol: lp.symbol ?? null, feeBps };
+}
+
 app.get('/api/zap/quote', async (req, res) => {
   try {
     if (process.env.ZAP_ENABLED !== 'true' || !process.env.ENSO_API_KEY) return res.json({ supported: false, reason: 'zap desativado' });
@@ -305,60 +415,25 @@ app.get('/api/zap/quote', async (req, res) => {
     const [pool] = await sql`SELECT project, chain, raw FROM pools WHERE pool_key = ${poolKey} LIMIT 1`;
     if (!pool) return res.json({ supported: false, reason: 'pool não encontrada' });
     const cfg = chainOf(pool.chain);
-
-    // Pool GERENCIADA (Beefy-CLM): o alvo do zap é o próprio vault (já resolve range/auto-compound).
-    let lp: { address: string; symbol?: string | null } | undefined;
-    const managedVault = pool.raw?.vaultAddress as string | undefined;
-    if (managedVault) {
-      lp = { address: managedVault, symbol: (pool.raw?.assets as string[] | undefined)?.join('/') ?? null };
-    } else {
-      const slug = ensoSlug(pool.project);
-      const underlying: string[] = (pool.raw?.underlyingTokens ?? []) as string[];
-      if (!slug || underlying.length === 0) return res.json({ supported: false, reason: 'protocolo sem zap' });
-      // resolve a posição (LP) alvo no Enso pelos tokens do par
-      const tq = new URLSearchParams({ chainId: String(cfg.chainId), protocolSlug: slug, page: '1' });
-      for (const u of underlying) tq.append('underlyingTokens', u);
-      const tr = await fetch(`${ENSO}/tokens?${tq.toString()}`, { headers: ensoHeaders() });
-      const tj = (await tr.json()) as { data?: Array<{ address: string; symbol?: string | null }> };
-      lp = tj.data?.[0];
-    }
-    if (!lp?.address) return res.json({ supported: false, reason: 'posição não encontrada no Enso' });
-
     const amountIn = BigInt(Math.floor(amountUsdc * 1e6)).toString(); // USDC = 6 casas
-    const rq = new URLSearchParams({
-      chainId: String(cfg.chainId),
-      fromAddress,
-      receiver: fromAddress,
-      amountIn,
-      tokenIn: cfg.usdc,
-      tokenOut: lp.address,
-      routingStrategy: 'router',
-      slippage: String(slippageBps),
-    });
-    // Taxa Mazari 0,30% na ENTRADA (spec §2.1) — Enso desconta do USDC e manda pro tesouro. Sem treasury → sem taxa.
-    const feeBps = MAZARI_TREASURY ? Number(ZAP_FEE_BPS) : 0;
-    if (MAZARI_TREASURY) {
-      rq.set('fee', ZAP_FEE_BPS);
-      rq.set('feeReceiver', MAZARI_TREASURY);
-    }
-    const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
-    if (!rr.ok) return res.json({ supported: false, reason: `Enso route ${rr.status}` });
-    const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
+
+    const z = await buildEnsoZap(pool as { project: string; raw: EnsoRaw }, cfg, amountIn, fromAddress, slippageBps);
+    if ('error' in z) return res.json({ supported: false, reason: z.error });
 
     res.json({
       supported: true,
-      lpTarget: lp.address,
-      lpSymbol: lp.symbol ?? null,
+      lpTarget: z.lpTarget,
+      lpSymbol: z.lpSymbol,
       tokenIn: cfg.usdc,
       amountIn,
-      to: d.tx?.to,
-      data: d.tx?.data,
-      value: d.tx?.value ?? '0',
-      spender: d.tx?.to, // approve do USDC vai pro router do Enso
-      amountOut: d.amountOut,
-      gas: d.gas,
-      priceImpact: d.priceImpact ?? 0,
-      feeBps,
+      to: z.to,
+      data: z.data,
+      value: z.value,
+      spender: z.spender, // approve do USDC vai pro router do Enso
+      amountOut: z.amountOut,
+      gas: z.gas,
+      priceImpact: z.priceImpact ?? 0,
+      feeBps: z.feeBps,
     });
   } catch (e) {
     console.error(e);
