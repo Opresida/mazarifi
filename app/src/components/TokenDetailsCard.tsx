@@ -1,11 +1,11 @@
 import { ExternalLink, FileCode } from 'lucide-react';
 import type { Pool } from '../types';
-import { assetRows, basescan } from '../lib/tokens';
+import { assetRows } from '../lib/tokens';
 import { Card } from './atoms';
 
 /** Detalhes de cada ativo da pool: site oficial + contrato (BaseScan). Estilo "Assets" da Beefy. */
 export function TokenDetailsCard({ pool }: { pool: Pool }) {
-  const rows = assetRows(pool).filter((r) => r.address || r.site);
+  const rows = assetRows(pool).filter((r) => r.explorer || r.site);
   if (rows.length === 0) return null;
   return (
     <Card className="p-4">
@@ -20,8 +20,8 @@ export function TokenDetailsCard({ pool }: { pool: Pool }) {
                   <ExternalLink size={12} /> Site
                 </a>
               )}
-              {r.address && (
-                <a href={basescan(r.address)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-edge px-2 py-1 text-muted transition-colors hover:border-lime/30 hover:text-ftext">
+              {r.explorer && (
+                <a href={r.explorer} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-edge px-2 py-1 text-muted transition-colors hover:border-lime/30 hover:text-ftext">
                   <FileCode size={12} /> Contrato
                 </a>
               )}

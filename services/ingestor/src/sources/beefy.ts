@@ -1,6 +1,9 @@
+import { CHAIN_LIST } from '@mazarifi/chain';
 import type { NormalizedPool } from '../types.js';
 
 const DEFILLAMA_CHART = 'https://yields.llama.fi/chart/';
+// Beefy usa o chain em minúsculo ('base'/'arbitrum'); mapeia pro cfg (que tem o nome DefiLlama).
+const BEEFY_CHAIN = new Map(CHAIN_LIST.map((c) => [c.beefyChain, c]));
 
 /** NOSSA matemática pro VAULT: soma o `apy` (total) realizado dia a dia nos últimos 15d (nos vaults Beefy o yield
  *  está em `apy`, não em `apyBase`). É o rendimento real do vault, já líquido da taxa do gestor (DefiLlama rastreia). */
@@ -37,7 +40,7 @@ const MAX_APY = 150;
 // Curadoria (decisão Humberto): estável + blue-chip + major (AERO/VELO/WELL...). Fora: micro/meme.
 const STABLE = new Set(['USDC', 'USDT', 'DAI', 'EURC', 'USDBC', 'GHO', 'USDS', 'SUSDS', 'CRVUSD', 'USD+', 'EUSD']);
 const BLUE = new Set([...STABLE, 'WETH', 'ETH', 'CBETH', 'WSTETH', 'EZETH', 'WEETH', 'RETH', 'SUPEROETHB', 'CBBTC', 'WBTC', 'TBTC', 'LBTC']);
-const MAJOR = new Set([...BLUE, 'AERO', 'VELO', 'WELL', 'MORPHO', 'VIRTUAL', 'BRETT', 'DEGEN', 'EURA', 'RDNT']);
+const MAJOR = new Set([...BLUE, 'AERO', 'VELO', 'WELL', 'MORPHO', 'VIRTUAL', 'BRETT', 'DEGEN', 'EURA', 'RDNT', 'ARB', 'GMX', 'PENDLE', 'GRAIL', 'OP']);
 
 function riskTier(assets: string[]): 'estavel' | 'blue-chip' | 'major' {
   const A = assets.map((a) => a.toUpperCase());
@@ -78,13 +81,14 @@ export async function fetchBeefyManagedPools(limit = 50): Promise<NormalizedPool
     fetch(DEFILLAMA_POOLS).then((r) => r.json() as Promise<{ data: LlamaBeefy[] }>),
   ]);
 
-  // Índice dos VAULTS Beefy no DefiLlama (project='beefy') por conjunto de ativos → o de maior TVL.
-  // + índice dos pools de CL subjacentes (pro volume 24h, que o vault não reporta).
+  // Índices POR CHAIN: VAULTS Beefy no DefiLlama (project='beefy') + pools de CL subjacentes (volume 24h).
+  // Chave = `${chainDefiLlama}:${assetKey}`.
+  const supported = new Set(CHAIN_LIST.map((c) => c.name));
   const beefyIdx = new Map<string, LlamaBeefy>();
   const clIdx = new Map<string, LlamaBeefy>();
   for (const p of llama.data) {
-    if (p.chain !== 'Base' || !p.tvlUsd) continue;
-    const k = assetKey(p.symbol.replace(/\//g, '-').split('-'));
+    if (!supported.has(p.chain) || !p.tvlUsd) continue;
+    const k = `${p.chain}:${assetKey(p.symbol.replace(/\//g, '-').split('-'))}`;
     if (p.project === 'beefy') {
       const cur = beefyIdx.get(k);
       if (!cur || p.tvlUsd > cur.tvlUsd) beefyIdx.set(k, p);
@@ -99,19 +103,20 @@ export async function fetchBeefyManagedPools(limit = 50): Promise<NormalizedPool
     return 0;
   };
 
-  // Candidatos: CLM ativos, curados, com vault casado no DefiLlama (≥ TVL mín).
-  type Cand = { v: CowVault; dl: LlamaBeefy; apyRef: number; key: string };
+  // Candidatos: CLM ativos, curados, de chain suportada, com vault casado no DefiLlama (≥ TVL mín).
+  type Cand = { v: CowVault; dl: LlamaBeefy; apyRef: number; key: string; chain: string };
   const cands: Cand[] = [];
   for (const v of cow) {
-    if (v.chain !== 'base' || v.status !== 'active' || !v.earnContractAddress) continue;
+    const cfg = BEEFY_CHAIN.get(v.chain ?? '');
+    if (!cfg || v.status !== 'active' || !v.earnContractAddress) continue;
     const assets = v.assets ?? [];
     if (assets.length < 1 || !assets.every((a) => MAJOR.has(a.toUpperCase()))) continue;
     const apyRef = vaultApy(v.id);
     if (!(apyRef > 0 && apyRef < MAX_APY)) continue; // sanidade: vault existe/ativo
-    const key = assetKey(assets);
+    const key = `${cfg.name}:${assetKey(assets)}`;
     const dl = beefyIdx.get(key);
     if (!dl || dl.tvlUsd < MIN_TVL) continue; // precisa do vault no DefiLlama (nossa matemática) + adoção real
-    cands.push({ v, dl, apyRef, key });
+    cands.push({ v, dl, apyRef, key, chain: cfg.name });
   }
 
   // NOSSA matemática: 15d realizado do `apy` (total) do VAULT (DefiLlama), em paralelo.
@@ -127,7 +132,7 @@ export async function fetchBeefyManagedPools(limit = 50): Promise<NormalizedPool
       poolKey: `beefy:${c.v.id}`,
       source: 'external',
       provenance: 'beefy',
-      chain: 'Base',
+      chain: c.chain,
       project: 'beefy-clm',
       symbol: assets.join('/'),
       tvlUsd: c.dl.tvlUsd,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useRoute } from 'wouter';
 import { Compass, Wallet, ArrowLeft, CheckCircle2, AlertTriangle, MinusCircle, ArrowRight } from 'lucide-react';
-import type { Pool, NetworkInfo } from '../types';
+import type { Pool, NetworkMap } from '../types';
 import { fetchPool, fetchPools, fetchNetwork } from '../api';
 import { Shell, type NavItem } from '../components/Shell';
 import { Card } from '../components/atoms';
@@ -27,7 +27,7 @@ export function PoolPage() {
   const key = params?.key ? decodeURIComponent(params.key) : '';
   const [pool, setPool] = useState<Pool | null>(null);
   const [all, setAll] = useState<Pool[]>([]);
-  const [net, setNet] = useState<NetworkInfo | null>(null);
+  const [net, setNet] = useState<NetworkMap | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -138,7 +138,7 @@ function ChecklistCard({ pool }: { pool: Pool }) {
   );
 }
 
-function MigrationCard({ pool, all, net }: { pool: Pool; all: Pool[]; net: NetworkInfo | null }) {
+function MigrationCard({ pool, all, net }: { pool: Pool; all: Pool[]; net: NetworkMap | null }) {
   const alt = bestAlternative(pool, all);
   if (!alt) {
     return (

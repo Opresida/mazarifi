@@ -1,5 +1,5 @@
 import { tokenIntegrity, type TokenIntegrity } from '@mazarifi/core';
-import { getTokenMeta } from '@mazarifi/chain';
+import { getTokenMeta, CHAINS } from '@mazarifi/chain';
 
 const COINS_CURRENT = 'https://coins.llama.fi/prices/current/';
 const MCAPS = 'https://coins.llama.fi/mcaps';
@@ -50,23 +50,31 @@ async function fetchMcaps(coins: string[]): Promise<Map<string, number>> {
   }
 }
 
-/** Resolve integridade dos tokens de incentivo. `knownAddrs` = endereços (lowercase) cujo protocolo é conhecido. */
-export async function fetchRewardIntegrity(addrs: string[], knownAddrs: Set<string>): Promise<Map<string, RewardIntegrity>> {
+export interface RewardRef {
+  addr: string;
+  chain: string; // 'Base' | 'Arbitrum' — define o prefixo do coins + o chainId do Etherscan
+}
+
+/** Resolve integridade dos tokens de incentivo (multi-chain). Map keyed por `${prefixo}:${addr}`. */
+export async function fetchRewardIntegrity(items: RewardRef[], knownAddrs: Set<string>): Promise<Map<string, RewardIntegrity>> {
   const out = new Map<string, RewardIntegrity>();
-  if (!addrs.length) return out;
-  const coins = addrs.map((a) => `base:${a.toLowerCase()}`);
+  if (!items.length) return out;
+  const keyOf = (it: RewardRef) => `${CHAINS[it.chain]?.coinsPrefix ?? 'base'}:${it.addr.toLowerCase()}`;
+  const coins = [...new Set(items.map(keyOf))];
   const [priceMap, mcapMap] = await Promise.all([fetchPriceInfo(coins), fetchMcaps(coins)]);
-  for (const a of addrs) {
-    const lc = a.toLowerCase();
-    const key = `base:${lc}`;
+  for (const it of items) {
+    const key = keyOf(it);
+    if (out.has(key)) continue;
+    const lc = it.addr.toLowerCase();
     const pi = priceMap.get(key);
     const mcapUsd = mcapMap.get(key) ?? null;
     const confidence = pi?.confidence ?? null;
     const tracked = pi != null;
-    const meta = await getTokenMeta(a).catch(() => ({ verified: null as boolean | null, ageDays: null as number | null, name: null }));
+    const chainId = CHAINS[it.chain]?.chainId ?? 8453;
+    const meta = await getTokenMeta(it.addr, chainId).catch(() => ({ verified: null as boolean | null, ageDays: null as number | null, name: null }));
     const knownProtocol = knownAddrs.has(lc);
     const integ = tokenIntegrity({ mcapUsd, confidence, tracked, ageDays: meta.ageDays, verified: meta.verified, knownProtocol });
-    out.set(key, { ...integ, token: a, symbol: pi?.symbol ?? null, mcapUsd, confidence, ageDays: meta.ageDays, verified: meta.verified, knownProtocol });
+    out.set(key, { ...integ, token: it.addr, symbol: pi?.symbol ?? null, mcapUsd, confidence, ageDays: meta.ageDays, verified: meta.verified, knownProtocol });
   }
   return out;
 }

@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { and, eq, lt } from 'drizzle-orm';
-import { getBaseGasPriceWei } from '@mazarifi/chain';
+import { getGasPriceWei, CHAIN_LIST } from '@mazarifi/chain';
 import { gasCostUsd, OP_GAS } from '@mazarifi/core';
 import { db } from './db/client.js';
 import { pools, network } from './db/schema.js';
@@ -72,25 +72,30 @@ async function main() {
   }
   console.log(`✅ ${all.length} pools persistidas no Neon.\n`);
 
-  // Gás de rede AO VIVO (Base mainnet, grátis) → custo de gás por tipo de operação.
+  // Gás de rede AO VIVO POR CHAIN (grátis, RPC público) → custo de gás por tipo de operação.
   try {
-    const [gasPriceWei, ethUsd] = await Promise.all([getBaseGasPriceWei(), fetchEthUsd()]);
-    const gasRow = {
-      id: 1,
-      gasPriceGwei: Number(gasPriceWei) / 1e9,
-      ethUsd,
-      gasLendingUsd: gasCostUsd({ gasUnits: OP_GAS.emprestimo, gasPriceWei, ethUsd }),
-      gasTradeUsd: gasCostUsd({ gasUnits: OP_GAS.troca, gasPriceWei, ethUsd }),
-      gasConcentratedUsd: gasCostUsd({ gasUnits: OP_GAS.concentrada, gasPriceWei, ethUsd }),
-      updatedAt: new Date(),
-    };
-    const { id: _id, ...gasUpd } = gasRow;
-    await db.insert(network).values(gasRow).onConflictDoUpdate({ target: network.id, set: gasUpd });
-    console.log(
-      `⛽ gás Base ${gasRow.gasPriceGwei.toFixed(4)} gwei (ETH $${ethUsd.toFixed(0)}) → empréstimo $${gasRow.gasLendingUsd.toFixed(3)} · troca $${gasRow.gasTradeUsd.toFixed(3)} · concentrada $${gasRow.gasConcentratedUsd.toFixed(3)}\n`,
-    );
+    const ethUsd = await fetchEthUsd(); // Base e Arbitrum usam ETH no gás
+    for (const cfg of CHAIN_LIST) {
+      try {
+        const gasPriceWei = await getGasPriceWei(cfg.name);
+        const gasRow = {
+          chain: cfg.name,
+          gasPriceGwei: Number(gasPriceWei) / 1e9,
+          ethUsd,
+          gasLendingUsd: gasCostUsd({ gasUnits: OP_GAS.emprestimo, gasPriceWei, ethUsd }),
+          gasTradeUsd: gasCostUsd({ gasUnits: OP_GAS.troca, gasPriceWei, ethUsd }),
+          gasConcentratedUsd: gasCostUsd({ gasUnits: OP_GAS.concentrada, gasPriceWei, ethUsd }),
+          updatedAt: new Date(),
+        };
+        const { chain: _c, ...gasUpd } = gasRow;
+        await db.insert(network).values(gasRow).onConflictDoUpdate({ target: network.chain, set: gasUpd });
+        console.log(`⛽ ${cfg.name} ${gasRow.gasPriceGwei.toFixed(4)} gwei → empréstimo $${gasRow.gasLendingUsd.toFixed(3)} · troca $${gasRow.gasTradeUsd.toFixed(3)} · concentrada $${gasRow.gasConcentratedUsd.toFixed(3)}`);
+      } catch (e) {
+        console.error(`gás ${cfg.name} falhou:`, (e as Error).message);
+      }
+    }
   } catch (e) {
-    console.error('gás Base falhou:', (e as Error).message);
+    console.error('preço ETH falhou:', (e as Error).message);
   }
 
   // RANKING — CEGO À ORIGEM: risco, depois rendimento anualizado (base 15d). `source` NÃO interfere.

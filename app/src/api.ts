@@ -1,4 +1,4 @@
-import type { Pool, Stats, AdminMetrics, BestPicks, NetworkInfo, Position, PoolChartData } from './types';
+import type { Pool, Stats, AdminMetrics, BestPicks, NetworkMap, Position, PoolChartData } from './types';
 
 export async function fetchPools(): Promise<Pool[]> {
   const r = await fetch('/api/pools');
@@ -37,7 +37,7 @@ export async function fetchPositions(address: string): Promise<Position[]> {
   return j.positions ?? [];
 }
 
-export async function fetchNetwork(): Promise<NetworkInfo | null> {
+export async function fetchNetwork(): Promise<NetworkMap | null> {
   const r = await fetch('/api/network');
   if (!r.ok) throw new Error(`API /network ${r.status}`);
   return r.json();

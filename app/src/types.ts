@@ -40,10 +40,12 @@ export interface Position {
   decimals: number;
   protocol: string | null;
   logoUri: string | null;
+  chain?: string; // 'Base' | 'Arbitrum'
 }
 
-/** Gás AO VIVO da Base + preço do ETH (custo de gás por tipo de operação, em US$). */
+/** Gás AO VIVO + preço do ETH (custo de gás por tipo de operação, em US$) — POR CHAIN. */
 export interface NetworkInfo {
+  chain?: string;
   gas_price_gwei: number | null;
   eth_usd: number | null;
   gas_lending_usd: number | null;
@@ -51,6 +53,8 @@ export interface NetworkInfo {
   gas_concentrated_usd: number | null;
   updated_at: string;
 }
+/** Mapa de gás por chain ('Base' | 'Arbitrum' → NetworkInfo). */
+export type NetworkMap = Record<string, NetworkInfo>;
 
 export interface Pool {
   pool_key: string;

@@ -2,6 +2,10 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { neon } from '@neondatabase/serverless';
+import { CHAINS, CHAIN_LIST } from '@mazarifi/chain';
+
+/** Config da chain pelo nome (pool.chain / ?chain); fallback Base. */
+const chainOf = (name: unknown) => CHAINS[String(name ?? 'Base')] ?? CHAINS.Base;
 
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL ausente (.env)');
 const sql = neon(process.env.DATABASE_URL);
@@ -91,8 +95,6 @@ app.get('/api/admin/metrics', async (_req, res) => {
 /** ZAP não-custodial via Enso: monta a tx "USDC → posição da pool" pro usuário ASSINAR (fundos nunca passam pela Mazari).
  *  A chave Enso fica SÓ aqui no servidor. ZAP_ENABLED=off → desativa (kill-switch). */
 const ENSO = 'https://api.enso.finance/api/v1';
-const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-const BASE_RPC = process.env.BASE_RPC || 'https://mainnet.base.org';
 const ensoHeaders = () => ({ Authorization: `Bearer ${process.env.ENSO_API_KEY}` });
 
 // Receita: taxa da Mazari (integrador Enso) — 0,30% na ENTRADA, saída 0% (spec §2.1). Sem MAZARI_TREASURY, sem taxa (graceful).
@@ -102,13 +104,14 @@ const MAZARI_TREASURY = process.env.MAZARI_TREASURY; // endereço que recebe a t
 /** Lê allowance de um ERC20 (server-side, RPC confiável — evita a RPC instável da carteira). token=USDC por padrão. */
 app.get('/api/zap/allowance', async (req, res) => {
   try {
+    const cfg = chainOf(req.query.chain);
     const owner = String(req.query.owner ?? '');
     const spender = String(req.query.spender ?? '');
-    const token = /^0x[0-9a-fA-F]{40}$/.test(String(req.query.token ?? '')) ? String(req.query.token) : USDC_BASE;
+    const token = /^0x[0-9a-fA-F]{40}$/.test(String(req.query.token ?? '')) ? String(req.query.token) : cfg.usdc;
     if (!/^0x[0-9a-fA-F]{40}$/.test(owner) || !/^0x[0-9a-fA-F]{40}$/.test(spender)) return res.status(400).json({ error: 'endereço inválido' });
     const pad = (h: string) => h.replace(/^0x/, '').toLowerCase().padStart(64, '0');
     const data = '0xdd62ed3e' + pad(owner) + pad(spender); // allowance(owner,spender)
-    const r = await fetch(BASE_RPC, {
+    const r = await fetch(cfg.rpc, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: token, data }, 'latest'] }),
@@ -127,28 +130,37 @@ app.get('/api/positions', async (req, res) => {
     if (!process.env.ENSO_API_KEY) return res.json({ positions: [] });
     const address = String(req.query.address ?? '');
     if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return res.status(400).json({ error: 'endereço inválido' });
-    const br = await fetch(`${ENSO}/wallet/balances?chainId=8453&eoaAddress=${address}&useEoa=true`, { headers: ensoHeaders() });
-    if (!br.ok) return res.json({ positions: [] });
-    const balances = (await br.json()) as Array<{ token: string; amount: string; decimals: number; price: number; symbol?: string; name?: string; logoUri?: string }>;
-    const candidates = balances
-      .map((b) => ({ ...b, valueUsd: (Number(b.amount) / 10 ** b.decimals) * (b.price || 0) }))
-      .filter((b) => b.valueUsd >= 1 && b.token.toLowerCase() !== USDC_BASE.toLowerCase())
-      .sort((a, b) => b.valueUsd - a.valueUsd)
-      .slice(0, 15);
-    const checked = await Promise.all(
-      candidates.map(async (b) => {
+    // Posições em TODAS as chains suportadas (cada uma com o seu chainId).
+    const perChain = await Promise.all(
+      CHAIN_LIST.map(async (cfg) => {
         try {
-          const mr = await fetch(`${ENSO}/tokens?chainId=8453&address=${b.token}`, { headers: ensoHeaders() });
-          const mj = (await mr.json()) as { data?: Array<{ type?: string; protocolSlug?: string }> };
-          const meta = mj.data?.[0];
-          if (!meta || !(meta.type === 'defi' || meta.protocolSlug)) return null;
-          return { token: b.token, symbol: b.symbol ?? null, name: b.name ?? null, valueUsd: b.valueUsd, amount: b.amount, decimals: b.decimals, protocol: meta.protocolSlug ?? null, logoUri: b.logoUri ?? null };
+          const br = await fetch(`${ENSO}/wallet/balances?chainId=${cfg.chainId}&eoaAddress=${address}&useEoa=true`, { headers: ensoHeaders() });
+          if (!br.ok) return [];
+          const balances = (await br.json()) as Array<{ token: string; amount: string; decimals: number; price: number; symbol?: string; name?: string; logoUri?: string }>;
+          const candidates = balances
+            .map((b) => ({ ...b, valueUsd: (Number(b.amount) / 10 ** b.decimals) * (b.price || 0) }))
+            .filter((b) => b.valueUsd >= 1 && b.token.toLowerCase() !== cfg.usdc.toLowerCase())
+            .sort((a, b) => b.valueUsd - a.valueUsd)
+            .slice(0, 15);
+          return await Promise.all(
+            candidates.map(async (b) => {
+              try {
+                const mr = await fetch(`${ENSO}/tokens?chainId=${cfg.chainId}&address=${b.token}`, { headers: ensoHeaders() });
+                const mj = (await mr.json()) as { data?: Array<{ type?: string; protocolSlug?: string }> };
+                const meta = mj.data?.[0];
+                if (!meta || !(meta.type === 'defi' || meta.protocolSlug)) return null;
+                return { token: b.token, symbol: b.symbol ?? null, name: b.name ?? null, valueUsd: b.valueUsd, amount: b.amount, decimals: b.decimals, protocol: meta.protocolSlug ?? null, logoUri: b.logoUri ?? null, chain: cfg.name };
+              } catch {
+                return null;
+              }
+            }),
+          );
         } catch {
-          return null;
+          return [];
         }
       }),
     );
-    res.json({ positions: checked.filter(Boolean) });
+    res.json({ positions: perChain.flat().filter(Boolean) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });
@@ -164,8 +176,9 @@ app.get('/api/zap/withdraw', async (req, res) => {
     const fromAddress = String(req.query.fromAddress ?? '');
     const slippageBps = Number(req.query.slippageBps) || 50;
     if (!/^0x[0-9a-fA-F]{40}$/.test(token) || !amount || !fromAddress) return res.status(400).json({ error: 'parâmetros faltando' });
+    const cfg = chainOf(req.query.chain);
     // SAÍDA 0% (spec §2.1) — a taxa Mazari é só na ENTRADA (zap-in). Saque sem fee.
-    const rq = new URLSearchParams({ chainId: '8453', fromAddress, receiver: fromAddress, amountIn: amount, tokenIn: token, tokenOut: USDC_BASE, routingStrategy: 'router', slippage: String(slippageBps) });
+    const rq = new URLSearchParams({ chainId: String(cfg.chainId), fromAddress, receiver: fromAddress, amountIn: amount, tokenIn: token, tokenOut: cfg.usdc, routingStrategy: 'router', slippage: String(slippageBps) });
     const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
     if (!rr.ok) return res.json({ supported: false, reason: `Enso route ${rr.status}` });
     const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
@@ -206,8 +219,9 @@ app.get('/api/zap/quote', async (req, res) => {
     const slippageBps = Number(req.query.slippageBps) || 50;
     if (!poolKey || !(amountUsdc > 0) || !fromAddress) return res.status(400).json({ error: 'parâmetros faltando' });
 
-    const [pool] = await sql`SELECT project, raw FROM pools WHERE pool_key = ${poolKey} LIMIT 1`;
+    const [pool] = await sql`SELECT project, chain, raw FROM pools WHERE pool_key = ${poolKey} LIMIT 1`;
     if (!pool) return res.json({ supported: false, reason: 'pool não encontrada' });
+    const cfg = chainOf(pool.chain);
 
     // Pool GERENCIADA (Beefy-CLM): o alvo do zap é o próprio vault (já resolve range/auto-compound).
     let lp: { address: string; symbol?: string | null } | undefined;
@@ -219,7 +233,7 @@ app.get('/api/zap/quote', async (req, res) => {
       const underlying: string[] = (pool.raw?.underlyingTokens ?? []) as string[];
       if (!slug || underlying.length === 0) return res.json({ supported: false, reason: 'protocolo sem zap' });
       // resolve a posição (LP) alvo no Enso pelos tokens do par
-      const tq = new URLSearchParams({ chainId: '8453', protocolSlug: slug, page: '1' });
+      const tq = new URLSearchParams({ chainId: String(cfg.chainId), protocolSlug: slug, page: '1' });
       for (const u of underlying) tq.append('underlyingTokens', u);
       const tr = await fetch(`${ENSO}/tokens?${tq.toString()}`, { headers: ensoHeaders() });
       const tj = (await tr.json()) as { data?: Array<{ address: string; symbol?: string | null }> };
@@ -229,11 +243,11 @@ app.get('/api/zap/quote', async (req, res) => {
 
     const amountIn = BigInt(Math.floor(amountUsdc * 1e6)).toString(); // USDC = 6 casas
     const rq = new URLSearchParams({
-      chainId: '8453',
+      chainId: String(cfg.chainId),
       fromAddress,
       receiver: fromAddress,
       amountIn,
-      tokenIn: USDC_BASE,
+      tokenIn: cfg.usdc,
       tokenOut: lp.address,
       routingStrategy: 'router',
       slippage: String(slippageBps),
@@ -252,7 +266,7 @@ app.get('/api/zap/quote', async (req, res) => {
       supported: true,
       lpTarget: lp.address,
       lpSymbol: lp.symbol ?? null,
-      tokenIn: USDC_BASE,
+      tokenIn: cfg.usdc,
       amountIn,
       to: d.tx?.to,
       data: d.tx?.data,
@@ -329,11 +343,17 @@ app.get('/api/pool/:key/chart', async (req, res) => {
   }
 });
 
-/** Estado da rede: gás AO VIVO da Base + preço do ETH (1 linha). */
-app.get('/api/network', async (_req, res) => {
+/** Estado da rede POR CHAIN: gás AO VIVO + ETH. `?chain=Base` → 1 linha; sem param → mapa por chain. */
+app.get('/api/network', async (req, res) => {
   try {
-    const [n] = await sql`SELECT * FROM network WHERE id = 1`;
-    res.json(n ?? null);
+    if (req.query.chain) {
+      const [n] = await sql`SELECT * FROM network WHERE chain = ${String(req.query.chain)}`;
+      return res.json(n ?? null);
+    }
+    const rows = await sql`SELECT * FROM network`;
+    const map: Record<string, unknown> = {};
+    for (const r of rows) map[(r as { chain: string }).chain] = r;
+    res.json(map);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });

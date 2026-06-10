@@ -1,7 +1,6 @@
 import { sendTx } from './wallet';
 import { encodeApprove, MAX_UINT } from './erc20';
-
-export const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+import { chainCfg } from './chains';
 
 export interface ZapQuote {
   supported: boolean;
@@ -28,10 +27,10 @@ export async function quoteZap(poolKey: string, amountUsdc: number, fromAddress:
   return r.json();
 }
 
-/** Allowance atual de USDC pro spender — lido pelo NOSSO servidor (RPC confiável, sem a RPC instável da carteira). */
-export async function usdcAllowance(owner: string, spender: string): Promise<bigint> {
+/** Allowance atual do USDC (da chain) pro spender — lido pelo NOSSO servidor (RPC confiável). */
+export async function usdcAllowance(owner: string, spender: string, chain: string): Promise<bigint> {
   try {
-    const r = await fetch(`/api/zap/allowance?owner=${owner}&spender=${spender}`);
+    const r = await fetch(`/api/zap/allowance?owner=${owner}&spender=${spender}&chain=${encodeURIComponent(chain)}`);
     if (!r.ok) return 0n;
     const j = (await r.json()) as { allowance?: string };
     return BigInt(j.allowance && j.allowance !== '0x' ? j.allowance : '0x0');
@@ -40,9 +39,9 @@ export async function usdcAllowance(owner: string, spender: string): Promise<big
   }
 }
 
-/** Aprova USDC pro spender (uma vez). Retorna o hash. */
-export async function approveUsdc(spender: string): Promise<string> {
-  return sendTx({ to: USDC_BASE, data: encodeApprove(spender, MAX_UINT) });
+/** Aprova o USDC da chain pro spender (uma vez). Retorna o hash. */
+export async function approveUsdc(spender: string, chain: string): Promise<string> {
+  return sendTx({ to: chainCfg(chain).usdc, data: encodeApprove(spender, MAX_UINT) });
 }
 
 /** Allowance de um token qualquer (pro saque: aprovar a posição pro router). */
@@ -75,9 +74,9 @@ export interface WithdrawQuote {
   feeBps?: number; // taxa da Mazari no saque (0 se não configurada)
 }
 
-/** Saque: monta a tx "posição → USDC" (Enso). */
-export async function quoteWithdraw(token: string, amount: string, fromAddress: string, slippageBps = 50): Promise<WithdrawQuote> {
-  const q = new URLSearchParams({ token, amount, fromAddress, slippageBps: String(slippageBps) });
+/** Saque: monta a tx "posição → USDC" (Enso), na chain da posição. */
+export async function quoteWithdraw(token: string, amount: string, fromAddress: string, chain: string, slippageBps = 50): Promise<WithdrawQuote> {
+  const q = new URLSearchParams({ token, amount, fromAddress, chain, slippageBps: String(slippageBps) });
   const r = await fetch(`/api/zap/withdraw?${q.toString()}`);
   if (!r.ok) return { supported: false, reason: `erro ${r.status}` };
   return r.json();

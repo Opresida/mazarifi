@@ -1,4 +1,4 @@
-import type { Pool, NetworkInfo, ManagedRaw } from '../types';
+import type { Pool, NetworkMap, ManagedRaw } from '../types';
 import { fmtUsd, safetyBand } from './format';
 
 /** Se a pool é GERENCIADA (Beefy-CLM: o gestor cuida do range), retorna os metadados; senão null. */
@@ -45,11 +45,12 @@ export function poolEntryCostPct(p: Pool): number {
   return fee * 100;
 }
 
-/** Gás de rede (US$, ao vivo) da operação típica desta pool, conforme o tipo. */
-export function poolGasUsd(p: Pool, net: NetworkInfo | null): number {
-  if (!net) return 0;
+/** Gás de rede (US$, ao vivo) da operação típica desta pool, conforme o tipo — da chain da pool. */
+export function poolGasUsd(p: Pool, net: NetworkMap | null): number {
+  const n = net?.[p.chain];
+  if (!n) return 0;
   const t = poolType(p);
-  const v = t === 'emprestimo' ? net.gas_lending_usd : t === 'concentrada' ? net.gas_concentrated_usd : net.gas_trade_usd;
+  const v = t === 'emprestimo' ? n.gas_lending_usd : t === 'concentrada' ? n.gas_concentrated_usd : n.gas_trade_usd;
   return v ?? 0;
 }
 

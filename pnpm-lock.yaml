@@ -82,6 +82,9 @@ importers:
 
   services/api:
     dependencies:
+      '@mazarifi/chain':
+        specifier: workspace:*
+        version: link:../../packages/chain
       '@neondatabase/serverless':
         specifier: ^0.10.4
         version: 0.10.4

@@ -12,11 +12,11 @@ export interface TokenMeta {
   name: string | null;
 }
 
-export async function getTokenMeta(address: string): Promise<TokenMeta> {
+export async function getTokenMeta(address: string, chainId = 8453): Promise<TokenMeta> {
   const key = process.env.ETHERSCAN_API_KEY;
   if (!key) return { verified: null, ageDays: null, name: null };
   try {
-    const r = await fetch(`${ETHERSCAN_V2}?chainid=8453&module=contract&action=getsourcecode&address=${address}&apikey=${key}`);
+    const r = await fetch(`${ETHERSCAN_V2}?chainid=${chainId}&module=contract&action=getsourcecode&address=${address}&apikey=${key}`);
     if (!r.ok) return { verified: null, ageDays: null, name: null };
     const j = (await r.json()) as { result?: Array<{ ABI?: string; ContractName?: string }> };
     const r0 = j.result?.[0];

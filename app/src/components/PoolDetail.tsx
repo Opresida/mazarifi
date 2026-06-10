@@ -1,9 +1,9 @@
-import type { Pool, NetworkInfo } from '../types';
+import type { Pool, NetworkMap } from '../types';
 import { fmtUsd, fmtUsdExact, fmtPct, fmtAgo, riskBand } from '../lib/format';
 import { poolEntryCostPct, poolGasUsd, managedInfo } from '../lib/pool';
 import { RiskBadge } from './RiskBadge';
 
-export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: NetworkInfo | null; onClose: () => void }) {
+export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: NetworkMap | null; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -29,7 +29,7 @@ export function PoolDetail({ pool, net = null, onClose }: { pool: Pool; net?: Ne
 }
 
 /** Conteúdo reutilizável — usado no drawer e na página do ativo (`/pool/:key`). */
-export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: NetworkInfo | null }) {
+export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: NetworkMap | null }) {
   const isNT = pool.source === 'nortoken';
   const managed = managedInfo(pool);
   const hasReturn = pool.return_15d != null;
@@ -198,7 +198,7 @@ export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: Netw
             )}
             <CostRow
               label="Gás de rede"
-              note={net ? `${(net.gas_price_gwei ?? 0).toFixed(4)} gwei · ao vivo · atualizado ${fmtAgo(net.updated_at)}` : 'indisponível'}
+              note={net?.[pool.chain] ? `${(net[pool.chain].gas_price_gwei ?? 0).toFixed(4)} gwei · ao vivo · atualizado ${fmtAgo(net[pool.chain].updated_at)}` : 'indisponível'}
               value={gasTxt}
             />
             {entryCost > 0 && <CostRow label="Slippage (impacto no preço)" note="depende do valor — avisamos no projetor se for grande" value="variável" muted />}

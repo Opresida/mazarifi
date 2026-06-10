@@ -3,6 +3,7 @@
  * Ground-truth: preço (getSlot0), volume/fees (SwapTracked) e posições travadas (locks).
  */
 export * from './client.js';
+export * from './chains.js';
 export * from './tokenMeta.js';
 export * from './deployments.js';
 export * from './abis.js';

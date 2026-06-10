@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Compass, Wallet } from 'lucide-react';
-import type { NetworkInfo } from '../types';
+import type { NetworkMap } from '../types';
 import { fetchNetwork } from '../api';
 import { Shell, type NavItem } from '../components/Shell';
 import { PositionsSection } from '../components/PositionsSection';
@@ -12,7 +12,7 @@ const NAV: NavItem[] = [
 ];
 
 export function MinhaAplicacaoPage() {
-  const [net, setNet] = useState<NetworkInfo | null>(null);
+  const [net, setNet] = useState<NetworkMap | null>(null);
   useEffect(() => {
     fetchNetwork()
       .then(setNet)
@@ -21,7 +21,7 @@ export function MinhaAplicacaoPage() {
   return (
     <Shell nav={NAV} topRight={<WalletButton />}>
       <h1 className="font-display text-2xl font-bold text-ftext">Minhas aplicações</h1>
-      <p className="mt-1 text-sm text-muted">O que você tem aplicado nas pools, na Base — com o valor de hoje e o botão de sacar.</p>
+      <p className="mt-1 text-sm text-muted">O que você tem aplicado nas pools (todas as redes) — com o valor de hoje e o botão de sacar.</p>
       <div className="mt-5">
         <PositionsSection net={net} />
       </div>

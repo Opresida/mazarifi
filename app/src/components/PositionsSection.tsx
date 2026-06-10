@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, ExternalLink, Wallet } from 'lucide-react';
-import type { NetworkInfo, Position } from '../types';
+import type { NetworkMap, Position } from '../types';
 import { fetchPositions } from '../api';
-import { useWallet, switchToBase, sendTx } from '../lib/wallet';
+import { useWallet, switchToChain, sendTx } from '../lib/wallet';
 import { quoteWithdraw, tokenAllowance, approveToken, type WithdrawQuote } from '../lib/zap';
+import { chainCfg } from '../lib/chains';
 import { Card } from './atoms';
 import { fmtUsd } from '../lib/format';
 import { WalletButton } from './WalletButton';
 
-export function PositionsSection({ net }: { net: NetworkInfo | null }) {
+export function PositionsSection({ net }: { net: NetworkMap | null }) {
   const { address } = useWallet();
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,21 +58,23 @@ export function PositionsSection({ net }: { net: NetworkInfo | null }) {
 
 type St = 'idle' | 'quoting' | 'ready' | 'approving' | 'withdrawing' | 'done';
 
-function WithdrawCard({ position, address, net, onDone }: { position: Position; address: string; net: NetworkInfo | null; onDone: () => void }) {
+function WithdrawCard({ position, address, net, onDone }: { position: Position; address: string; net: NetworkMap | null; onDone: () => void }) {
   const [st, setSt] = useState<St>('idle');
   const [quote, setQuote] = useState<WithdrawQuote | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
+  const pchain = position.chain ?? 'Base';
+  const n = net?.[pchain];
   const outUsd = quote?.amountOut ? Number(quote.amountOut) / 1e6 : null;
   const impactPct = quote?.priceImpact != null ? quote.priceImpact / 100 : null;
-  const gasUsd = quote?.gas && net?.gas_price_gwei && net?.eth_usd ? (Number(quote.gas) * net.gas_price_gwei) / 1e9 * net.eth_usd : null;
+  const gasUsd = quote?.gas && n?.gas_price_gwei && n?.eth_usd ? (Number(quote.gas) * n.gas_price_gwei) / 1e9 * n.eth_usd : null;
 
   async function doQuote() {
     setErr(null);
     setSt('quoting');
     try {
-      const q = await quoteWithdraw(position.token, position.amount, address);
+      const q = await quoteWithdraw(position.token, position.amount, address, pchain);
       if (!q.supported) {
         setErr(`Saque indisponível (${q.reason}).`);
         setSt('idle');
@@ -97,7 +100,7 @@ function WithdrawCard({ position, address, net, onDone }: { position: Position; 
     if (!quote?.to || !quote.data || !quote.spender) return;
     setErr(null);
     try {
-      await switchToBase();
+      await switchToChain(pchain);
       const need = BigInt(position.amount);
       if ((await tokenAllowance(address, quote.spender, position.token)) < need) {
         setSt('approving');
@@ -133,7 +136,7 @@ function WithdrawCard({ position, address, net, onDone }: { position: Position; 
       {st === 'done' ? (
         <div className="mt-3">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-lime"><CheckCircle2 size={14} /> Saque enviado!</p>
-          {txHash && <a href={`https://basescan.org/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] text-lime hover:text-lime-bright">Ver no BaseScan <ExternalLink size={12} /></a>}
+          {txHash && <a href={`${chainCfg(pchain).explorer}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] text-lime hover:text-lime-bright">Ver no {chainCfg(pchain).explorerName} <ExternalLink size={12} /></a>}
         </div>
       ) : st === 'ready' || st === 'approving' || st === 'withdrawing' ? (
         <>

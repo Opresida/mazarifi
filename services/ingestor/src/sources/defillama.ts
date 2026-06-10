@@ -1,6 +1,10 @@
 import { ilFullRange } from '@mazarifi/core';
+import { CHAINS, CHAIN_LIST } from '@mazarifi/chain';
 import { fetchRewardIntegrity, isKnownProtocolProject } from './rewardTokens.js';
 import type { NormalizedPool } from '../types.js';
+
+/** Prefixo do coins.llama.fi pela chain da pool ('base', 'arbitrum'). */
+const coinsPrefix = (chain: string) => CHAINS[chain]?.coinsPrefix ?? 'base';
 
 const DEFILLAMA_POOLS = 'https://yields.llama.fi/pools';
 const DEFILLAMA_CHART = 'https://yields.llama.fi/chart/';
@@ -55,7 +59,7 @@ async function computeImpermanentLoss(base: LlamaPool[]): Promise<Map<string, nu
   const out = new Map<string, number>();
   const ilPools = base.filter(ilApplies);
   const coinIds = new Set<string>();
-  for (const p of ilPools) for (const t of p.underlyingTokens!.slice(0, 2)) coinIds.add(`base:${t.toLowerCase()}`);
+  for (const p of ilPools) for (const t of p.underlyingTokens!.slice(0, 2)) coinIds.add(`${coinsPrefix(p.chain)}:${t.toLowerCase()}`);
   const coins = [...coinIds];
   if (coins.length === 0) return out;
 
@@ -64,7 +68,7 @@ async function computeImpermanentLoss(base: LlamaPool[]): Promise<Map<string, nu
   const [pn, pt] = await Promise.all([fetchPrices(coins), fetchPrices(coins, then)]);
 
   for (const p of ilPools) {
-    const [t0, t1] = p.underlyingTokens!.slice(0, 2).map((t) => `base:${t.toLowerCase()}`);
+    const [t0, t1] = p.underlyingTokens!.slice(0, 2).map((t) => `${coinsPrefix(p.chain)}:${t.toLowerCase()}`);
     const p0n = pn.get(t0), p1n = pn.get(t1), p0t = pt.get(t0), p1t = pt.get(t1);
     if (p0n && p1n && p0t && p1t && p0t > 0 && p1t > 0) {
       const r = p0n / p1n / (p0t / p1t);
@@ -111,27 +115,31 @@ export async function fetch15dReturn(poolId: string): Promise<Realized15d | null
 
 const AUDITED = ['uniswap', 'aerodrome', 'curve', 'balancer', 'compound', 'aave', 'morpho', 'pendle'];
 
-/** Puxa pools REAIS da Base + IL 15d + retorno REALIZADO 15d (do /chart). */
+/** Puxa pools REAIS (todas as chains do CHAINS) + IL 15d + retorno REALIZADO 15d (do /chart). */
 export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
   const res = await fetch(DEFILLAMA_POOLS);
   if (!res.ok) throw new Error(`DefiLlama HTTP ${res.status}`);
   const json = (await res.json()) as { data: LlamaPool[] };
 
-  // Dois baldes pra garantir cobertura: o topo de TVL na Base é dominado por EMPRÉSTIMO (lending),
-  // então pegamos também as melhores pools de TROCA (AMM = exposure 'multi') separadamente.
-  const all = json.data.filter((p) => p.chain === 'Base' && p.tvlUsd > 0).sort((a, b) => b.tvlUsd - a.tvlUsd);
-  const topOverall = all.slice(0, limit); // top por TVL (lending + o que vier)
-  const topTrade = all.filter((p) => p.exposure === 'multi').slice(0, 25); // garante pools de troca/concentradas
+  // POR CHAIN: dois baldes (top TVL — domina lending — + top de troca/concentrada 'multi').
   const seen = new Set<string>();
-  const base = [...topOverall, ...topTrade].filter((p) => (seen.has(p.pool) ? false : (seen.add(p.pool), true)));
+  const base: LlamaPool[] = [];
+  for (const cfg of CHAIN_LIST) {
+    const all = json.data.filter((p) => p.chain === cfg.name && p.tvlUsd > 0).sort((a, b) => b.tvlUsd - a.tvlUsd);
+    const topOverall = all.slice(0, limit);
+    const topTrade = all.filter((p) => p.exposure === 'multi').slice(0, 25);
+    for (const p of [...topOverall, ...topTrade]) if (!seen.has(p.pool)) (seen.add(p.pool), base.push(p));
+  }
 
-  // Tokens de incentivo: endereços únicos + quais têm protocolo conhecido.
-  const rewardAddrs = new Set<string>();
+  // Tokens de incentivo (com chain, pro prefixo certo) + quais têm protocolo conhecido.
+  const rewardItems: { addr: string; chain: string }[] = [];
+  const rewardSeen = new Set<string>();
   const knownAddrs = new Set<string>();
   for (const p of base)
     for (const a of p.rewardTokens ?? []) {
       const lc = a.toLowerCase();
-      rewardAddrs.add(lc);
+      const k = `${p.chain}:${lc}`;
+      if (!rewardSeen.has(k)) (rewardSeen.add(k), rewardItems.push({ addr: lc, chain: p.chain }));
       if (isKnownProtocolProject(p.project)) knownAddrs.add(lc);
     }
 
@@ -140,7 +148,7 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
   const [ilMap, charts, rewardInteg] = await Promise.all([
     computeImpermanentLoss(base).catch(() => new Map<string, number>()),
     Promise.all(base.map((p) => fetch15dReturn(p.pool).catch(() => null))),
-    fetchRewardIntegrity([...rewardAddrs], knownAddrs).catch(() => new Map()),
+    fetchRewardIntegrity(rewardItems, knownAddrs).catch(() => new Map()),
   ]);
 
   return base.map((p, i) => {
@@ -152,10 +160,11 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
     const fallbackFee = ((p.apyBase7d ?? p.apyBase) ?? null) != null ? ((p.apyBase7d ?? p.apyBase)! * WINDOW_DAYS) / 365 : null;
     const feeReturn15d = ch ? ch.feeReturn : fallbackFee;
     const rewardReturn15d = ch ? ch.rewardReturn : p.apyReward != null ? (p.apyReward * WINDOW_DAYS) / 365 : 0;
+    const pfx = coinsPrefix(p.chain);
     const rewardSymbol =
-      (p.rewardTokens ?? []).map((a) => rewardInteg.get(`base:${a.toLowerCase()}`)?.symbol).filter(Boolean).join(', ') || null;
+      (p.rewardTokens ?? []).map((a) => rewardInteg.get(`${pfx}:${a.toLowerCase()}`)?.symbol).filter(Boolean).join(', ') || null;
     const primaryReward = (p.rewardTokens ?? [])[0];
-    const rewardIntegrity = primaryReward ? rewardInteg.get(`base:${primaryReward.toLowerCase()}`) ?? null : null;
+    const rewardIntegrity = primaryReward ? rewardInteg.get(`${pfx}:${primaryReward.toLowerCase()}`) ?? null : null;
     return {
       poolKey: `external:${p.pool}`,
       source: 'external' as const,

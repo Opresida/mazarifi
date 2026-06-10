@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, ArrowRight } from 'lucide-react';
-import type { Pool, NetworkInfo } from '../types';
-import { useWallet, switchToBase, sendTx } from '../lib/wallet';
+import type { Pool, NetworkMap } from '../types';
+import { useWallet, switchToChain, sendTx } from '../lib/wallet';
 import { quoteZap, usdcAllowance, approveUsdc, type ZapQuote } from '../lib/zap';
 import { managedInfo } from '../lib/pool';
+import { chainCfg } from '../lib/chains';
 import { Card } from './atoms';
 
 type St = 'idle' | 'quoting' | 'ready' | 'unsupported' | 'approving' | 'depositing' | 'done';
 
-export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | null }) {
+export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null }) {
   const { address, connect, connecting } = useWallet();
   const [amount, setAmount] = useState(5);
   const [st, setSt] = useState<St>('idle');
@@ -17,8 +18,9 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | nul
   const [err, setErr] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
+  const n = net?.[pool.chain];
   const impactPct = quote?.priceImpact != null ? quote.priceImpact / 100 : null;
-  const gasUsd = quote?.gas && net?.gas_price_gwei && net?.eth_usd ? (Number(quote.gas) * net.gas_price_gwei) / 1e9 * net.eth_usd : null;
+  const gasUsd = quote?.gas && n?.gas_price_gwei && n?.eth_usd ? (Number(quote.gas) * n.gas_price_gwei) / 1e9 * n.eth_usd : null;
   const highImpact = impactPct != null && impactPct > 1;
 
   async function doQuote() {
@@ -38,7 +40,7 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | nul
 
   async function pollAllowance(spender: string, need: bigint) {
     for (let i = 0; i < 25; i++) {
-      if ((await usdcAllowance(address!, spender)) >= need) return true;
+      if ((await usdcAllowance(address!, spender, pool.chain)) >= need) return true;
       await new Promise((r) => setTimeout(r, 3000));
     }
     return false;
@@ -48,11 +50,11 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | nul
     if (!quote?.to || !quote.data || !quote.spender || !address) return;
     setErr(null);
     try {
-      await switchToBase();
+      await switchToChain(pool.chain);
       const need = BigInt(quote.amountIn ?? '0');
-      if ((await usdcAllowance(address, quote.spender)) < need) {
+      if ((await usdcAllowance(address, quote.spender, pool.chain)) < need) {
         setSt('approving');
-        await approveUsdc(quote.spender);
+        await approveUsdc(quote.spender, pool.chain);
         if (!(await pollAllowance(quote.spender, need))) {
           setErr('A aprovação ainda não confirmou — espere uns segundos e clique Depositar de novo.');
           setSt('ready');
@@ -79,8 +81,8 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | nul
           Acompanhar minhas aplicações <ArrowRight size={15} />
         </Link>
         {txHash && (
-          <a href={`https://basescan.org/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ftext">
-            Ver no BaseScan <ExternalLink size={13} />
+          <a href={`${chainCfg(pool.chain).explorer}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ftext">
+            Ver no {chainCfg(pool.chain).explorerName} <ExternalLink size={13} />
           </a>
         )}
       </Card>
@@ -90,7 +92,7 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkInfo | nul
   return (
     <Card className="glow-lime border-lime/30 p-4">
       <p className="flex items-center gap-2 text-sm font-semibold text-ftext"><ShieldCheck size={15} className="text-lime" /> Depositar com 1 clique</p>
-      <p className="mt-1 text-[11px] leading-relaxed text-muted-2">Você põe USDC, a gente troca e monta a pool. <b>Não-custodial</b>: você assina da sua carteira, a Mazari nunca toca no dinheiro.</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-muted-2">Você põe USDC <b>na rede {pool.chain}</b>, a gente troca e monta a pool. <b>Não-custodial</b>: você assina da sua carteira, a Mazari nunca toca no dinheiro.</p>
 
       {!address ? (
         <button onClick={connect} disabled={connecting} className="mt-3 w-full rounded-xl bg-lime px-4 py-2.5 text-sm font-semibold text-ink hover:bg-lime-bright disabled:opacity-60">

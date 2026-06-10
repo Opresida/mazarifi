@@ -45,9 +45,9 @@ export const pools = pgTable('pools', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Estado da rede (1 linha, id=1): gás AO VIVO da Base + preço do ETH → custo de gás por tipo de op. */
+/** Estado da rede POR CHAIN: gás AO VIVO + preço do ETH → custo de gás por tipo de op. */
 export const network = pgTable('network', {
-  id: integer('id').primaryKey(), // sempre 1
+  chain: text('chain').primaryKey(), // 'Base' | 'Arbitrum'
   gasPriceGwei: doublePrecision('gas_price_gwei'),
   ethUsd: doublePrecision('eth_usd'),
   gasLendingUsd: doublePrecision('gas_lending_usd'),

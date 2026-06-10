@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { chainCfg } from './chains';
 
 /** Allowlist de admin. TODO Humberto: trocar/adicionar a SUA carteira de admin. */
 const ADMIN_ALLOWLIST = ['0xB1390d94faCBc45DB9D509b7b050141C83B56055'].map((a) => a.toLowerCase());
@@ -17,20 +18,19 @@ declare global {
   }
 }
 
-const BASE_CHAIN_HEX = '0x2105'; // Base mainnet (8453)
-
-/** Garante que a carteira está na Base (troca/adiciona a rede se preciso). */
-export async function switchToBase(): Promise<void> {
+/** Garante que a carteira está na chain certa (troca/adiciona a rede se preciso). */
+export async function switchToChain(chainName: string): Promise<void> {
   if (!window.ethereum) throw new Error('Sem carteira');
+  const cfg = chainCfg(chainName);
   const cid = (await window.ethereum.request({ method: 'eth_chainId' })) as string;
-  if (cid?.toLowerCase() === BASE_CHAIN_HEX) return;
+  if (cid?.toLowerCase() === cfg.chainIdHex.toLowerCase()) return;
   try {
-    await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_HEX }] });
+    await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: cfg.chainIdHex }] });
   } catch (e) {
     if ((e as { code?: number })?.code === 4902) {
       await window.ethereum.request({
         method: 'wallet_addEthereumChain',
-        params: [{ chainId: BASE_CHAIN_HEX, chainName: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: ['https://mainnet.base.org'], blockExplorerUrls: ['https://basescan.org'] }],
+        params: [{ chainId: cfg.chainIdHex, chainName: cfg.chainName, nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: [cfg.rpc], blockExplorerUrls: [cfg.explorer] }],
       });
     } else throw e;
   }
