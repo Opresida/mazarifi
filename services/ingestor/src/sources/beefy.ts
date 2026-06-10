@@ -64,7 +64,11 @@ interface LlamaBeefy {
   tvlUsd: number;
   underlyingTokens?: string[] | null;
   il7d?: number | null;
+  volumeUsd1d?: number | null;
 }
+
+// Pools de CL subjacentes (o vault Beefy NÃO reporta volume; o pool de baixo sim).
+const CL_PROJECTS = new Set(['aerodrome-slipstream', 'pancakeswap-amm-v3', 'uniswap-v3', 'velodrome-slipstream']);
 
 /** Vaults Beefy-CLM da Base, curados, com a NOSSA matemática no rendimento real do vault (DefiLlama). */
 export async function fetchBeefyManagedPools(limit = 50): Promise<NormalizedPool[]> {
@@ -75,12 +79,19 @@ export async function fetchBeefyManagedPools(limit = 50): Promise<NormalizedPool
   ]);
 
   // Índice dos VAULTS Beefy no DefiLlama (project='beefy') por conjunto de ativos → o de maior TVL.
+  // + índice dos pools de CL subjacentes (pro volume 24h, que o vault não reporta).
   const beefyIdx = new Map<string, LlamaBeefy>();
+  const clIdx = new Map<string, LlamaBeefy>();
   for (const p of llama.data) {
-    if (p.chain !== 'Base' || p.project !== 'beefy' || !p.tvlUsd) continue;
+    if (p.chain !== 'Base' || !p.tvlUsd) continue;
     const k = assetKey(p.symbol.replace(/\//g, '-').split('-'));
-    const cur = beefyIdx.get(k);
-    if (!cur || p.tvlUsd > cur.tvlUsd) beefyIdx.set(k, p);
+    if (p.project === 'beefy') {
+      const cur = beefyIdx.get(k);
+      if (!cur || p.tvlUsd > cur.tvlUsd) beefyIdx.set(k, p);
+    } else if (CL_PROJECTS.has(p.project) && p.volumeUsd1d != null) {
+      const cur = clIdx.get(k);
+      if (!cur || p.tvlUsd > cur.tvlUsd) clIdx.set(k, p);
+    }
   }
 
   const vaultApy = (id: string): number => {
@@ -122,7 +133,7 @@ export async function fetchBeefyManagedPools(limit = 50): Promise<NormalizedPool
       tvlUsd: c.dl.tvlUsd,
       apyBase: c.apyRef, // referência (Beefy) — NÃO é o headline
       apyReward: null,
-      volumeUsd24h: null,
+      volumeUsd24h: clIdx.get(c.key)?.volumeUsd1d ?? null, // volume do pool de CL subjacente
       feeTier: null,
       feeReturn15d: realized.ret, // NOSSA conta (apy total do vault somado dia a dia)
       rewardReturn15d: 0, // o `apy` já é o total líquido do vault
