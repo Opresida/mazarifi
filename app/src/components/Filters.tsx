@@ -22,7 +22,7 @@ export const FILTERS: FilterDef[] = [
   { id: 'bluechip', group: 'dentro', emoji: '💎', label: 'ETH / BTC', help: 'As cripto grandes e consolidadas.', match: isBlueChip },
   { id: 'incentivo', group: 'dentro', emoji: '🎁', label: 'Com incentivo', help: 'Pools que pagam um bônus extra em outro token (ex.: AERO). Rende mais — confira a solidez do token no detalhe.', match: (p) => p.reward_symbol != null },
   { id: 'sem-incentivo', group: 'dentro', emoji: '🧱', label: 'Sem incentivo', help: 'Rendimento "puro" — só a comissão/juros, sem bônus em token volátil. Mais previsível.', match: (p) => p.reward_symbol == null },
-  { id: 'gerenciado', group: 'gestao', emoji: '⚙', label: 'Gerenciado', help: 'Um gestor (Beefy) cuida do range e reinveste pra você — cobra uma taxa do rendimento. Bom pra pool concentrada sem dor de cabeça.', match: (p) => !!managedInfo(p) },
+  { id: 'gerenciado', group: 'gestao', emoji: '⚙', label: 'Gerenciado', help: 'A gestão automática cuida do range e reinveste pra você (via gestor parceiro auditado) — cobra uma taxa do rendimento. Pool concentrada sem dor de cabeça.', match: (p) => !!managedInfo(p) },
   { id: 'direto', group: 'gestao', emoji: '🛠', label: 'Direto', help: 'Você entra direto na pool, sem intermediário e sem a taxa do gestor — mas o range é por sua conta.', match: (p) => !managedInfo(p) },
   { id: 'seguro', group: 'seguranca', emoji: '🟢', label: 'Seguro', help: 'Nível de segurança alto.', match: (p) => safetyBand(p.risk_score).label === 'Seguro' },
   { id: 'medio', group: 'seguranca', emoji: '🟡', label: 'Médio', help: 'Nível de segurança médio.', match: (p) => safetyBand(p.risk_score).label === 'Médio' },

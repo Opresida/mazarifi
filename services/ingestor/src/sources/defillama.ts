@@ -85,8 +85,9 @@ interface Realized15d {
   volHigh: number; // apyBase máximo (%)
 }
 
-/** Retorno REALIZADO nos últimos 15 dias, somando o fee diário (apyBase/365) da série do DefiLlama. */
-async function fetch15dReturn(poolId: string): Promise<Realized15d | null> {
+/** Retorno REALIZADO nos últimos 15 dias, somando o fee diário (apyBase/365) da série do DefiLlama.
+ *  Exportado: a NOSSA matemática (regra global) — usada também nas pools GERENCIADAS (Beefy). */
+export async function fetch15dReturn(poolId: string): Promise<Realized15d | null> {
   try {
     const r = await fetch(`${DEFILLAMA_CHART}${poolId}`);
     if (!r.ok) return null;

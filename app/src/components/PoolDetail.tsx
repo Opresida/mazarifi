@@ -62,18 +62,17 @@ export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: Netw
           /* pool GERENCIADA: a Beefy cuida do range → mostramos o APY do vault (não a cascata fee/IL) */
           <div className="mt-4 rounded-2xl border border-iris/30 bg-iris/5 p-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wider text-iris">APY gerenciado</p>
-              <span className="rounded-md bg-panel-2 px-2 py-0.5 text-[10px] text-muted">estimativa</span>
+              <p className="text-xs font-semibold uppercase tracking-wider text-iris">Rendeu nos últimos {win} dias</p>
+              <span className="rounded-md bg-panel-2 px-2 py-0.5 text-[10px] text-muted">medido por nós</span>
             </div>
             <div className="mt-2">
-              <span className="font-display tnum text-3xl font-bold text-iris">{(pool.net_annual_15d ?? pool.apy_base ?? 0).toFixed(1)}%</span>
-              <span className="ml-2 text-xs text-muted-2">ao ano</span>
+              <span className="font-display tnum text-3xl font-bold text-iris">{retLabel}</span>
+              <span className="ml-2 text-xs text-muted-2">em {win} dias · ≈ {(pool.net_annual_15d ?? 0).toFixed(0)}%/ano</span>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-muted-2">
-              ⚙ <b className="text-ftext">A {managed.manager} cuida do range</b> e faz auto-compound pra você — taxa de{' '}
-              <b>{managed.managerFeePct}%</b> sobre o rendimento, já embutida nesse APY. Pool <b>concentrada</b> · o número{' '}
-              <span className="text-rose">pode variar bastante</span> (APY de pool concentrada oscila). Liquidez do pool:{' '}
-              <b>{fmtUsd(pool.tvl_usd)}</b>.
+              ⚙ <b className="text-ftext">Gestão automática</b>: cuidamos do range e fazemos auto-compound pra você (via gestor
+              parceiro auditado) — taxa de <b>{managed.managerFeePct}%</b> sobre o rendimento, <b>já embutida</b> nesse número.
+              Pool <b>concentrada</b> · <span className="text-rose">pode variar</span>. Liquidez do vault: <b>{fmtUsd(pool.tvl_usd)}</b>.
             </p>
           </div>
         ) : (
