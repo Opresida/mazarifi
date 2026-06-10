@@ -4,7 +4,7 @@ Documento de contexto profundo (decisões, restrições, convenções) que **nã
 
 ## Identidade do projeto
 
-- **Produto:** otimizador/agregador de yield em pools de liquidez, EVM-first na **Base**. Posicionamento: "melhor rendimento líquido ajustado a risco, mastigado pro leigo".
+- **Produto:** otimizador/agregador de yield em pools de liquidez, EVM multi-chain — **Base + Arbitrum** (o "chain" é config, dá pra adicionar rede sem refatorar). Posicionamento: "melhor rendimento líquido ajustado a risco, mastigado pro leigo".
 - **Repo:** `Opresida/mazarifi` (público → GitHub Actions grátis). Local: `C:\Users\user\mazarifi`.
 - **Dono:** Humberto. Time: Humberto + Claude (sem terceiros no código).
 - **Marca:** Mazari Fi é produto da MAZARI (empresa-mãe). Identidade visual **"Ink & Lime"**.
@@ -24,7 +24,9 @@ Documento de contexto profundo (decisões, restrições, convenções) que **nã
 - **Janela de 15 dias REALIZADA** (não APY projetado) — após descobrir que o número-herói de uma pool volátil enganava (52,9% → variava 37-106%/semana).
 - **fee × incentivo separados** — `feeAprPct = apyBase7d/apyBase`, NUNCA `apy` total (evita contar emissão como fee, ex.: Aerodrome).
 - **Gás ao vivo** (Base RPC grátis) + **integridade do reward** (DefiLlama mcap + Etherscan verified) — porque o custo mais traiçoeiro não é o gás (centavos), é o **incentivo "papel"**.
-- **Zap via Enso** (aggregator não-custodial) em vez de contrato próprio — evita auditoria/risco e mantém a régua "software, não gestor".
+- **Zap via Enso** (aggregator não-custodial) em vez de contrato próprio — evita auditoria/risco e mantém a régua "software, não gestor". **Limite:** o Enso só roteia *alguns* vaults gerenciados (404/422) → tarefa aberta de mapear zappers alternativos (Beefy own zap, LiFi direto, Portals, Odos) e esconder os não-zappáveis.
+- **Multi-chain config-driven** (`packages/chain/chains.ts` `CHAINS`) — adicionar rede = uma entrada; ingestor/api/app leem de lá. **Base + Arbitrum** (Optimism/Polygon fora: DefiLlama não rastreia os vaults → futuro via databarn da Beefy).
+- **Cross-chain via LiFi** (não custódia nova): detecção automática de onde está o USDC + ponte (`Mazari-Fi` integrator, rebate 0,3%) + **depósito em 1 assinatura** (LiFi `contractCalls` executa o zap Enso no destino). Saída de erro segura: se o destino reverter, o USDC fica na rede destino e o user finaliza normal — nada se perde.
 - **`/cybersecurity:ceo-pentest-complete` NÃO se aplica** ao nosso código (é pra alvos públicos reais); auditoria de código foi feita com mentalidade OWASP.
 
 ## Régua regulatória (CVM)
@@ -43,7 +45,7 @@ Modelo TRAVADO. **Rota B** (vault de terceiro). **Basic vs Pro:**
 - **Pro (pago, POR CARTEIRA):** desbloqueia o **Autopilot** (auto-switch) + mais vaults + prioridade. Por carteira = anti-split.
 - **Entrada (Enso): 0,30% (30 bps), saída 0%.** ✅ **ATIVA** — `feeReceiver = 0x8ed2322492dba29d2d783a7de0c873c51444cbd2` (tesouro, no `api/.env`). Aplica a Basic e Pro.
 - **Tabela Pro FINAL (âncora 5%, degraus de $5, ≤35% do lucro):** Basic $0–$3.500 → Pro **$5** ($3.5–7k) · **$10** ($7–10.5k) · **$15** ($10.5–14k) · **$20** ($14–17.5k) · **$25** ($17.5k+). Fórmula-verdade: `preço_mês = 0,35 × dep × APY_líq / 12`. **Rail dinâmico:** o código cobra no máx 35% do lucro com o **APY REAL do vault** (publicada usa 5%). Por que 5%: APY seguro real (estáveis Base). Por que 35% (não 45%): user já paga ~9,5% da Beefy por baixo.
-- **Swap 0,2%** no auto-switch (hook, só Pro) · **Rebates LiFi** · **Slippage 50/50** declarado.
+- **Swap 0,2%** no auto-switch (hook, só Pro) · **Rebate LiFi 0,3% na ponte — LIGADO** (integrator `Mazari-Fi`, sem API key; tesouro cadastrado em todas as redes EVM no portal.li.fi) · **Slippage 50/50** declarado.
 - **Perf fee 8-10% + harvest:** Rota A (deferida, precisa auditoria). **Limite Rota B:** taxa do vault (~9,5%) **intocável** (sem revenue-share público) — mostrar, não skimmar.
 - Princípio: **honest DeFi — nenhuma taxa escondida** (tudo na tela, inclusive a do parceiro). **Saída sempre 0%.**
 

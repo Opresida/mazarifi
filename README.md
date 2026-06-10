@@ -1,9 +1,9 @@
 # Mazari Fi
 
 > **Otimizador de rendimento de pools de liquidez — com honestidade radical.**
-> Quase todo mundo te mostra o número bonito e esconde a perda. A Mazari Fi mostra o **líquido** — o que sobra depois de IL, taxas, gás e slippage — em **linguagem de gente**, pra qualquer brasileiro entender em 10 segundos. E agora também **executa**: deposite USDC e a gente monta a pool pra você, **sem custódia**.
+> Quase todo mundo te mostra o número bonito e esconde a perda. A Mazari Fi mostra o **líquido** — o que sobra depois de IL, taxas, gás e slippage — em **linguagem de gente**, pra qualquer brasileiro entender em 10 segundos. E agora também **executa**: deposite USDC e a gente monta a pool pra você, **sem custódia** — **inclusive entre redes, num clique só** (a gente acha seu USDC em qualquer rede e investe no vault do destino via ponte).
 
-Repo: **`Opresida/mazarifi`** · Rede: **Base** (mainnet) · Stack: monorepo **pnpm**.
+Repo: **`Opresida/mazarifi`** · Redes: **Base + Arbitrum** (mainnet) · Stack: monorepo **pnpm**.
 
 ---
 
@@ -14,6 +14,7 @@ Repo: **`Opresida/mazarifi`** · Rede: **Base** (mainnet) · Stack: monorepo **p
 - **Incentivo não assusta, informa:** checamos a **solidez do token de recompensa** (ex.: AERO = sólido) e mostramos o **piso sem incentivo**.
 - **Score de risco CEGO À ORIGEM:** pool Nortoken não ganha bônus; `source` é só metadata.
 - **Não-custodial:** seu dinheiro nunca passa pela Mazari. Depósito e saque são **1 transação que VOCÊ assina** (via aggregator Enso).
+- **Multi-chain + cross-chain:** pools em **Base e Arbitrum**. Se seu USDC está numa rede e a pool em outra, a gente **detecta sozinho** e traz pra você — com a opção de **depositar em 1 assinatura** (ponte LiFi + entra no vault no destino).
 
 ---
 
@@ -79,16 +80,21 @@ Segredos em `.env` (NUNCA commitar — já gitignored) + secrets no GitHub (pro 
 | `DATABASE_URL` | ingestor + api | Neon Postgres | ✅ |
 | `ETHERSCAN_API_KEY` | ingestor | "contrato verificado" do token de incentivo | ✅ (etherscan.io) |
 | `ENSO_API_KEY` | api | zap não-custodial (depósito/saque/posições) | ✅ (enso.finance) |
+| `MAZARI_TREASURY` | api | recebe a taxa 0,30% (Enso) + o rebate da ponte (LiFi) | — |
+| `ZAP_FEE_BPS` | api | taxa de entrada em bps (default 30 = 0,30%) | — |
+| `LIFI_INTEGRATOR` | api | integrator string do portal.li.fi (`Mazari-Fi`) → liga o rebate da ponte | ✅ (portal.li.fi) |
+| `ARBITRUM_RPC` | api/chain | RPC da Arbitrum (opcional — default público) | ✅ |
 | `ZAP_ENABLED` | api | kill-switch do botão de depósito/saque | — |
 
-Atualização automática dos dados: **GitHub Actions a cada 20 min** (`.github/workflows/ingest.yml`, grátis em repo público).
+Atualização automática dos dados: **GitHub Actions a cada 20 min** (`.github/workflows/ingest.yml`, grátis em repo público). **Deploy:** `MAZARI_TREASURY` + `LIFI_INTEGRATOR` precisam ser setados no servidor (não vão no git).
 
 ---
 
 ## Status
 
 ✅ **Fase 1 (Inteligência)** completa + **Execução não-custodial** (depositar → ver → sacar via Enso).
-🔨 Pendências honestas (casamento exato da pool, gestão de range CL, landing redesign) em [`TODO.md`](TODO.md).
-⏳ Fase 2 (keeper) e Fase 3 (performance fee) no roadmap.
+✅ **Multi-chain (Base + Arbitrum)** + **ponte LiFi** (rebate 0,3% ligado) + **depósito cross-chain em 1 assinatura**.
+🔨 Amanhã: **teste com valor real** + **mapear zappers alternativos ao Enso** (cobre só ~2/6 vaults Arb) — ver [`TODO.md`](TODO.md).
+⏳ Autopilot/Pro, Fase 2 (keeper) e Fase 3 (performance fee) no roadmap.
 
 > Built on Base · Transparência total. Retorno real. Não é garantia de ganho.

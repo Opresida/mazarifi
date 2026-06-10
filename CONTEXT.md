@@ -28,12 +28,16 @@ Todo token Nortoken nasce **medido on-chain** (o hook emite `SwapTracked` → vo
 
 > ✅ **Seleção de gestora (§4) — CONSTRUÍDA na Base (2026-06):** pools **GERENCIADAS Beefy-CLM** como 1ª classe (`sources/beefy.ts`, ~18). **Lição (Humberto pegou):** primeiro li a API errada (APY chave-base=0 vs `-vault`=10,3%; TVL do wrapper ~$2,5k vs do **pool** subjacente ~$1,6M+). Refeito certo: APY na chave `-vault`, liquidez = TVL do pool (DefiLlama match), curadoria estável+blue-chip+**major** (AERO/VELO/WELL; decisão Humberto), teto APY 150%. O **vault cuida do range** (resolve o gap), zap entra no `vaultAddress`, badge "⚙ Gerenciado" + "APY gerenciado (estimativa)" (não finge 15d realizado). **Gamma/Arrakis: Enso não cobre** (fora). Limite honesto: APY de CL é ruidoso → rotulado, nunca herói.
 
-**Receita (spec §2):** 0,30% na entrada (Enso) · Pro (assinatura por tier de depósito) · 0,2% no swap de auto-switch (hook, só Pro) · rebates LiFi · slippage 50/50 declarado. Perf fee = Rota A.
+**Receita (spec §2):** 0,30% na entrada (Enso) · **0,3% na ponte (LiFi rebate — LIGADO, integrator `Mazari-Fi`)** · Pro (assinatura por tier de depósito) · 0,2% no swap de auto-switch (hook, só Pro) · slippage 50/50 declarado. Perf fee = Rota A.
+
+## Multi-chain + cross-chain (2026-06)
+Hoje em **Base + Arbitrum** (Arbitrum dobrou as gerenciadas). O "chain" virou config (`CHAINS`) → toda regra (doutrina, matemática própria, curadoria, taxa, risks, volume) flui automático. Quando o USDC do user está numa rede e a pool em outra, a Mazari **detecta sozinha** e oferece trazer — com **depósito cross-chain em 1 assinatura** (ponte LiFi + zap Enso no vault do destino). **Limite honesto:** o Enso roteia só **alguns** vaults gerenciados → mapear zappers alternativos (Beefy own zap, etc.) é a próxima tarefa.
 
 ## Ordem de build
 1. **Fase 1 — Inteligência (read-only):** ranking honesto + custos + integridade. ✅
 2. **Zap Rota B (atual):** depositar/sacar via Enso (taxa **0,30% na entrada**, saída grátis). ✅
-3. **Imposto BR (1.5)** · **Pro tiers** · **LiFi** · **Rota A**. ⏳ (seleção de gestora: engavetada na Base — ver nota acima; revisitar multi-chain/Rota A)
+3. **Multi-chain (Base+Arbitrum) + ponte LiFi + cross-chain 1 assinatura.** ✅
+4. **Mapear zappers (cobertura ~100% das gerenciadas)** · **Autopilot/Pro** · **Imposto BR (1.5)** · **Optimism/Polygon (databarn Beefy)** · **Rota A**. ⏳
 
 ## Regras inegociáveis
 

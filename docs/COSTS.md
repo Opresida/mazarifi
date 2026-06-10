@@ -22,8 +22,10 @@
 - **Fee da Mazari** (receita da execução — spec `mazari-fi-spec.md` §2.1): **0,30% na ENTRADA (zap-in) · saída 0%** — taxa de integrador via **Enso** (`fee=30bps`, `feeReceiver=tesouro`; descontada do USDC), mostrada na confirmação do depósito. Recupera-se em ~11 dias de rendimento + filtra capital mercenário. Performance fee sobre o rendimento = Rota A (deferida, precisa auditoria).
 - **Taxa do vault de terceiro (Rota B)** — Beefy/Gamma cobram **~9,5% sobre o RENDIMENTO** (Beefy Base = 9,5% uniforme, verificado na API), **embutida no APY** (o `apyBase`/`totalApy` já vem líquido pro depositante). **Intocável** (cai no tesouro deles, sem revenue-share público) — tratamos como dinheiro da gestora. **Transparência total:** exibimos essa taxa na tela mesmo assim (diferencial vs Beefy, que esconde).
 - **Imposto (GCAP BR):** Fase 1.5 — módulo `core/tax-br` (isenção R$35k/mês, Grupo 08), relatório AUXILIAR + disclaimer.
-- **Bridge pra Base:** assumimos fundos **já na Base**. Custo de bridge fica fora (nota).
 - **Rebalance** (posição gerenciada): só na Fase 2 (keeper) — gás + swap por rebalance.
+
+## 🌉 PONTE CROSS-CHAIN (LiFi) — custo do user + receita nossa
+Quando o USDC do user está em outra rede, a ponte (LiFi) tem **custo da ponte (~0,25%, bridge fee + slippage)** — **mostrado na tela** antes de assinar. Em cima dela cobramos o **rebate de integrador 0,3%** (`Mazari-Fi`, vai pro tesouro). No **depósito cross-chain em 1 assinatura**, o valor que entra no vault é calculado pelo **USDC que efetivamente chega** (a estimativa de saída da LiFi vem quebrada ~0, então não a usamos). Custos totais declarados: ponte ~0,25% + rebate Mazari 0,3% + entrada Enso 0,30%.
 
 ## ❗ NÃO é problema (verificado)
 - **Compounding/capitalização:** o headline usa **`return_15d` realizado** + anualização **simples** (×365/15). NÃO assumimos capitalização diária grátis → sem otimismo escondido.
