@@ -8,7 +8,7 @@ import { Card } from './atoms';
 type Tab = 'price' | 'apy' | 'tvl';
 const LIME = '#34E29B';
 
-export function PoolChart({ poolKey, isPair }: { poolKey: string; isPair: boolean }) {
+export function PoolChart({ poolKey, isPair, managed = false }: { poolKey: string; isPair: boolean; managed?: boolean }) {
   const [data, setData] = useState<PoolChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>(isPair ? 'price' : 'apy');
@@ -58,7 +58,7 @@ export function PoolChart({ poolKey, isPair }: { poolKey: string; isPair: boolea
         <>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <Stat label="Mínimo" v={fmt(min)} />
-            <Stat label="Atual" v={fmt(cur)} accent />
+            <Stat label="Atual" v={fmt(cur)} accent tag={managed && active === 'price' ? '✓ no range' : undefined} />
             <Stat label="Máximo" v={fmt(max)} />
           </div>
           <div className="mt-3 h-44">
@@ -84,7 +84,11 @@ export function PoolChart({ poolKey, isPair }: { poolKey: string; isPair: boolea
           </div>
           {active === 'price' && (
             <p className="mt-1.5 text-[10px] leading-relaxed text-muted-2">
-              Preço do par (ratio dos 2 ativos). MIN/ATUAL/MAX <b>observados</b> nos últimos ~30 dias — não é um range gerenciado por nós.
+              {managed ? (
+                <>Preço do par (ratio dos 2 ativos). <b className="text-lime">A gestão automática mantém a posição dentro da faixa</b> (no range) — quando o preço se mexe, ela rebalanceia.</>
+              ) : (
+                <>Preço do par (ratio dos 2 ativos). MIN/ATUAL/MAX <b>observados</b> nos últimos ~30 dias — não é um range gerenciado por nós.</>
+              )}
             </p>
           )}
         </>
@@ -93,11 +97,12 @@ export function PoolChart({ poolKey, isPair }: { poolKey: string; isPair: boolea
   );
 }
 
-function Stat({ label, v, accent }: { label: string; v: string; accent?: boolean }) {
+function Stat({ label, v, accent, tag }: { label: string; v: string; accent?: boolean; tag?: string }) {
   return (
     <div className="rounded-lg border border-edge-soft bg-ink p-2">
       <p className="text-[9px] uppercase tracking-wide text-muted-2">{label}</p>
       <p className={`font-display tnum mt-0.5 text-sm font-semibold ${accent ? 'text-lime' : 'text-ftext'}`}>{v}</p>
+      {tag && <p className="text-[8px] font-semibold text-lime">{tag}</p>}
     </div>
   );
 }

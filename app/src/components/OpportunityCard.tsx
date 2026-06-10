@@ -24,8 +24,8 @@ export function OpportunityCard({ pool, onOpen, rank }: { pool: Pool; onOpen: ()
           <span className="shrink-0 rounded bg-ink px-1.5 py-0.5 text-[10px] text-muted-2">{pool.chain}</span>
           {managedInfo(pool) && (
             <span
-              className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold text-iris"
-              style={{ background: 'color-mix(in srgb, var(--color-iris) 16%, transparent)' }}
+              className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold text-lime"
+              style={{ background: 'color-mix(in srgb, var(--color-lime) 16%, transparent)' }}
               title={`Gestão automática — cuidamos do range pra você (taxa ${managedInfo(pool)?.managerFeePct}% sobre o rendimento, via gestor parceiro auditado)`}
             >
               ⚙ Gerenciado

@@ -59,14 +59,14 @@ export function PoolDetailContent({ pool, net = null }: { pool: Pool; net?: Netw
         </div>
 
         {managed ? (
-          /* pool GERENCIADA: a Beefy cuida do range → mostramos o APY do vault (não a cascata fee/IL) */
-          <div className="mt-4 rounded-2xl border border-iris/30 bg-iris/5 p-4">
+          /* pool GERENCIADA: a gestão cuida do range → mostramos o rendimento do vault (não a cascata fee/IL) */
+          <div className="mt-4 rounded-2xl border border-lime/30 bg-lime/5 p-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wider text-iris">Rendeu nos últimos {win} dias</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-lime">Rendeu nos últimos {win} dias</p>
               <span className="rounded-md bg-panel-2 px-2 py-0.5 text-[10px] text-muted">medido por nós</span>
             </div>
             <div className="mt-2">
-              <span className="font-display tnum text-3xl font-bold text-iris">{retLabel}</span>
+              <span className="font-display tnum text-3xl font-bold text-lime">{retLabel}</span>
               <span className="ml-2 text-xs text-muted-2">em {win} dias · ≈ {(pool.net_annual_15d ?? 0).toFixed(0)}%/ano</span>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-muted-2">

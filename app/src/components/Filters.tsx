@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { HelpCircle, SlidersHorizontal, X } from 'lucide-react';
 import type { Pool } from '../types';
-import { poolType, isStable, isBlueChip, managedInfo } from '../lib/pool';
+import { isStable, isBlueChip, managedInfo } from '../lib/pool';
 import { safetyBand } from '../lib/format';
 
-type Group = 'tipo' | 'dentro' | 'gestao' | 'seguranca' | 'origem';
+type Group = 'tipo' | 'dentro' | 'seguranca';
 interface FilterDef {
   id: string;
   group: Group;
@@ -15,24 +15,17 @@ interface FilterDef {
 }
 
 export const FILTERS: FilterDef[] = [
-  { id: 'emprestimo', group: 'tipo', emoji: '🏦', label: 'Empréstimo', help: 'Você empresta 1 moeda e recebe juros. Simples e mais seguro.', match: (p) => poolType(p) === 'emprestimo' },
-  { id: 'troca', group: 'tipo', emoji: '🔄', label: 'Pool de troca', help: 'Você vira casa de câmbio de um par e ganha comissão. Tem risco de perda se o preço variar.', match: (p) => poolType(p) === 'troca' },
-  { id: 'concentrada', group: 'tipo', emoji: '🎯', label: 'Concentrada', help: 'Como a troca, mas turbinada: rende mais, porém é a mais complexa e arriscada.', match: (p) => poolType(p) === 'concentrada' },
-  { id: 'estavel', group: 'dentro', emoji: '🪙', label: 'Moedas estáveis', help: 'Moedas que não balançam (tipo dólar). Quase sem risco de variação.', match: isStable },
+  { id: 'emprestimo', group: 'tipo', emoji: '🏦', label: 'Empréstimo', help: 'Você empresta uma moeda e recebe juros. Simples e seguro — sem risco de variação.', match: (p) => p.exposure === 'single' },
+  { id: 'gerenciada', group: 'tipo', emoji: '🎯', label: 'Gerenciada', help: 'A gestão automática cuida do range e reinveste pra você. Rende mais — pool concentrada sem dor de cabeça.', match: (p) => !!managedInfo(p) },
+  { id: 'estavel', group: 'dentro', emoji: '🪙', label: 'Estáveis', help: 'Moedas que não balançam (tipo dólar). Quase sem risco de variação.', match: isStable },
   { id: 'bluechip', group: 'dentro', emoji: '💎', label: 'ETH / BTC', help: 'As cripto grandes e consolidadas.', match: isBlueChip },
-  { id: 'incentivo', group: 'dentro', emoji: '🎁', label: 'Com incentivo', help: 'Pools que pagam um bônus extra em outro token (ex.: AERO). Rende mais — confira a solidez do token no detalhe.', match: (p) => p.reward_symbol != null },
-  { id: 'sem-incentivo', group: 'dentro', emoji: '🧱', label: 'Sem incentivo', help: 'Rendimento "puro" — só a comissão/juros, sem bônus em token volátil. Mais previsível.', match: (p) => p.reward_symbol == null },
-  { id: 'gerenciado', group: 'gestao', emoji: '⚙', label: 'Gerenciado', help: 'A gestão automática cuida do range e reinveste pra você (via gestor parceiro auditado) — cobra uma taxa do rendimento. Pool concentrada sem dor de cabeça.', match: (p) => !!managedInfo(p) },
-  { id: 'direto', group: 'gestao', emoji: '🛠', label: 'Direto', help: 'Você entra direto na pool, sem intermediário e sem a taxa do gestor — mas o range é por sua conta.', match: (p) => !managedInfo(p) },
   { id: 'seguro', group: 'seguranca', emoji: '🟢', label: 'Seguro', help: 'Nível de segurança alto.', match: (p) => safetyBand(p.risk_score).label === 'Seguro' },
   { id: 'medio', group: 'seguranca', emoji: '🟡', label: 'Médio', help: 'Nível de segurança médio.', match: (p) => safetyBand(p.risk_score).label === 'Médio' },
   { id: 'arriscado', group: 'seguranca', emoji: '🔴', label: 'Arriscado', help: 'Nível de segurança baixo — cuidado.', match: (p) => safetyBand(p.risk_score).label === 'Arriscado' },
-  { id: 'nortoken', group: 'origem', emoji: '⬢', label: 'Nortoken', help: 'Pools criadas na nossa plataforma, medidas direto na blockchain — nossa vantagem injusta.', match: (p) => p.source === 'nortoken' },
-  { id: 'mercado', group: 'origem', emoji: '🌐', label: 'Mercado', help: 'Pools do mercado aberto (Aave, Uniswap, Aerodrome…), trazidas do DefiLlama.', match: (p) => p.source === 'external' },
 ];
 
-const GROUP_TITLE: Record<Group, string> = { tipo: 'Como funciona', dentro: 'O que tem dentro', gestao: 'Gestão', seguranca: 'Segurança', origem: 'Origem' };
-const GROUPS: Group[] = ['tipo', 'dentro', 'gestao', 'seguranca', 'origem'];
+const GROUP_TITLE: Record<Group, string> = { tipo: 'Tipo', dentro: 'O que tem dentro', seguranca: 'Segurança' };
+const GROUPS: Group[] = ['tipo', 'dentro', 'seguranca'];
 
 /** Filtra as pools: AND entre grupos, OR dentro do grupo. */
 export function applyFilters(pools: Pool[], active: Set<string>): Pool[] {

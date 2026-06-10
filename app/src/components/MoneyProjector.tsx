@@ -8,17 +8,18 @@ export function MoneyProjector({
   gasUsd = 0,
   tvlUsd = null,
   title = 'Quanto você quer aplicar?',
+  showSlippage = false,
 }: {
   netAprPct: number | null;
   entryCostPct?: number;
   gasUsd?: number;
   tvlUsd?: number | null;
   title?: string;
+  showSlippage?: boolean; // só pra gerenciada/troca (tem swap) — empréstimo não tem slippage
 }) {
   const [amount, setAmount] = useState(1000);
   const p = projectEarnings(amount, netAprPct, entryCostPct, gasUsd);
-  const isTrade = entryCostPct > 0;
-  const slippage = isTrade ? priceImpactPct(amount, tvlUsd) : 0;
+  const slippage = showSlippage ? priceImpactPct(amount, tvlUsd) : 0;
   const breakEven = p.breakEvenDays != null ? Math.ceil(p.breakEvenDays) : null;
 
   return (
@@ -56,7 +57,7 @@ export function MoneyProjector({
         {p.entryCost > 0 ? (
           <>
             <span className="font-semibold">Custo de entrada ~{fmtUsdExact(p.entryCost)}</span> (uma vez):{' '}
-            {p.swapCost > 0 ? `swap ${fmtUsdExact(p.swapCost)} + ` : 'só o '}gás {fmtUsdExact(p.gasCost)}{' '}
+            {p.swapCost > 0 ? `${showSlippage ? 'taxa + swap' : 'taxa Mazari'} ${fmtUsdExact(p.swapCost)} + ` : 'só o '}gás {fmtUsdExact(p.gasCost)}{' '}
             <span className="text-gold/70">(ao vivo)</span>.{' '}
             {breakEven != null ? (
               <>Se paga em ~<strong>{breakEven} dia{breakEven > 1 ? 's' : ''}</strong> — depois é lucro.</>
@@ -70,7 +71,7 @@ export function MoneyProjector({
       </div>
 
       {/* Slippage: aviso quando o valor é grande pra pool */}
-      {isTrade && slippage > 0.1 && (
+      {showSlippage && slippage > 0.1 && (
         <p className="mt-2 rounded-xl border border-rose/25 bg-rose/8 px-3 py-2 text-[11px] leading-relaxed text-rose">
           ⚠ Impacto no preço ~{slippage.toFixed(2)}% na entrada/saída — seu valor é grande pra essa pool (TVL {fmtUsd(tvlUsd)}). Considere dividir.
         </p>

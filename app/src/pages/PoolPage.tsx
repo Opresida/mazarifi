@@ -8,10 +8,11 @@ import { Card } from '../components/atoms';
 import { PoolDetailContent } from '../components/PoolDetail';
 import { DepositPanel } from '../components/DepositPanel';
 import { PoolChart } from '../components/PoolChart';
+import { MoneyProjector } from '../components/MoneyProjector';
 import { WalletButton } from '../components/WalletButton';
 import { buildChecklist, type CheckItem } from '../lib/checklist';
 import { bestAlternative, migrationAdvice } from '../lib/migration';
-import { poolAnnual, poolName, poolEntryCostPct, poolGasUsd } from '../lib/pool';
+import { poolAnnual, poolName, poolEntryCostPct, poolGasUsd, managedInfo } from '../lib/pool';
 import { fmtUsdExact } from '../lib/format';
 
 const NAV: NavItem[] = [
@@ -56,7 +57,15 @@ export function PoolPage() {
           <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
             <div className="min-w-0 space-y-4">
               <PoolDetailContent pool={pool} net={net} />
-              <PoolChart poolKey={pool.pool_key} isPair={pool.exposure === 'multi'} />
+              <MoneyProjector
+                title="Simule seu ganho aqui"
+                netAprPct={poolAnnual(pool)}
+                entryCostPct={0.3 + poolEntryCostPct(pool)}
+                gasUsd={poolGasUsd(pool, net)}
+                tvlUsd={pool.tvl_usd}
+                showSlippage={!!managedInfo(pool)}
+              />
+              <PoolChart poolKey={pool.pool_key} isPair={pool.exposure === 'multi'} managed={!!managedInfo(pool)} />
               <ChecklistCard pool={pool} />
             </div>
             <div className="space-y-4">
