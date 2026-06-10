@@ -60,7 +60,7 @@ export function PoolPage() {
               <MoneyProjector
                 title="Simule seu ganho aqui"
                 netAprPct={poolAnnual(pool)}
-                entryCostPct={0.3 + poolEntryCostPct(pool)}
+                entryCostPct={poolEntryCostPct(pool)}
                 gasUsd={poolGasUsd(pool, net)}
                 tvlUsd={pool.tvl_usd}
                 showSlippage={!!managedInfo(pool)}

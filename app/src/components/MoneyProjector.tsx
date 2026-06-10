@@ -9,17 +9,21 @@ export function MoneyProjector({
   tvlUsd = null,
   title = 'Quanto você quer aplicar?',
   showSlippage = false,
+  mazariFeePct = 0.3,
 }: {
   netAprPct: number | null;
-  entryCostPct?: number;
+  entryCostPct?: number; // SÓ o swap (0 p/ empréstimo) — a taxa Mazari entra separada
   gasUsd?: number;
   tvlUsd?: number | null;
   title?: string;
   showSlippage?: boolean; // só pra gerenciada/troca (tem swap) — empréstimo não tem slippage
+  mazariFeePct?: number; // nossa taxa de entrada (0,30%)
 }) {
   const [amount, setAmount] = useState(1000);
-  const p = projectEarnings(amount, netAprPct, entryCostPct, gasUsd);
+  const p = projectEarnings(amount, netAprPct, entryCostPct + mazariFeePct, gasUsd);
   const slippage = showSlippage ? priceImpactPct(amount, tvlUsd) : 0;
+  const mazariCost = (amount * Math.max(0, mazariFeePct)) / 100;
+  const swapOnly = (amount * Math.max(0, entryCostPct)) / 100;
   const breakEven = p.breakEvenDays != null ? Math.ceil(p.breakEvenDays) : null;
 
   return (
@@ -57,7 +61,7 @@ export function MoneyProjector({
         {p.entryCost > 0 ? (
           <>
             <span className="font-semibold">Custo de entrada ~{fmtUsdExact(p.entryCost)}</span> (uma vez):{' '}
-            {p.swapCost > 0 ? `${showSlippage ? 'taxa + swap' : 'taxa Mazari'} ${fmtUsdExact(p.swapCost)} + ` : 'só o '}gás {fmtUsdExact(p.gasCost)}{' '}
+            <b>taxa Mazari {fmtUsdExact(mazariCost)}</b> (0,30%){swapOnly > 0 ? ` + swap ${fmtUsdExact(swapOnly)}` : ''} + gás {fmtUsdExact(p.gasCost)}{' '}
             <span className="text-gold/70">(ao vivo)</span>.{' '}
             {breakEven != null ? (
               <>Se paga em ~<strong>{breakEven} dia{breakEven > 1 ? 's' : ''}</strong> — depois é lucro.</>

@@ -102,7 +102,7 @@ export function UserDashboard() {
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors ${projKind === k ? 'bg-lime/15 text-lime' : 'text-muted hover:text-ftext'}`}
                 >
                   {k === 'lending' ? <Landmark size={13} /> : <Repeat size={13} />}
-                  {k === 'lending' ? 'Empréstimo' : 'Pool de troca'}
+                  {k === 'lending' ? 'Empréstimo' : 'Gerenciada'}
                 </button>
               ))}
             </div>
@@ -111,7 +111,8 @@ export function UserDashboard() {
               entryCostPct={projPool ? poolEntryCostPct(projPool) : 0}
               gasUsd={projPool ? poolGasUsd(projPool, net) : 0}
               tvlUsd={projPool?.tvl_usd ?? null}
-              title={`Quanto você quer aplicar ${projKind === 'lending' ? 'no empréstimo' : 'na pool de troca'}?`}
+              showSlippage={projKind === 'trade'}
+              title={`Quanto você quer aplicar ${projKind === 'lending' ? 'no empréstimo' : 'na gerenciada'}?`}
             />
           </div>
         );
