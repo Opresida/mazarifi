@@ -90,6 +90,7 @@ export interface ManagedRaw {
   vaultAddress?: string;
   riskTier?: 'estavel' | 'blue-chip' | 'major';
   beefyApy?: number;
+  risks?: Record<string, boolean | number> | null; // flags do Risk Checklist (Beefy)
   assets?: string[];
   underlyingTokens?: string[];
 }

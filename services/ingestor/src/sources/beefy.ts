@@ -54,6 +54,7 @@ interface CowVault {
   assets?: string[];
   earnContractAddress?: string;
   platformId?: string;
+  risks?: Record<string, boolean | number>; // flags do Risk Checklist da Beefy
 }
 interface LlamaBeefy {
   pool: string;
@@ -148,6 +149,7 @@ export async function fetchBeefyManagedPools(limit = 50): Promise<NormalizedPool
         platformId: c.v.platformId,
         riskTier: tier,
         beefyApy: c.apyRef,
+        risks: c.v.risks ?? null, // Risk Checklist (flags da Beefy)
         underlyingTokens: c.dl.underlyingTokens ?? [],
         assets,
       },

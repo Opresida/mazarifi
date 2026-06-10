@@ -9,8 +9,10 @@ import { PoolDetailContent } from '../components/PoolDetail';
 import { DepositPanel } from '../components/DepositPanel';
 import { PoolChart } from '../components/PoolChart';
 import { MoneyProjector } from '../components/MoneyProjector';
+import { TokenDetailsCard } from '../components/TokenDetailsCard';
 import { WalletButton } from '../components/WalletButton';
 import { buildChecklist, type CheckItem } from '../lib/checklist';
+import { beefyChecklist } from '../lib/beefyRisks';
 import { bestAlternative, migrationAdvice } from '../lib/migration';
 import { poolAnnual, poolName, poolEntryCostPct, poolGasUsd, managedInfo } from '../lib/pool';
 import { fmtUsdExact } from '../lib/format';
@@ -66,6 +68,7 @@ export function PoolPage() {
                 showSlippage={!!managedInfo(pool)}
               />
               <PoolChart poolKey={pool.pool_key} isPair={pool.exposure === 'multi'} managed={!!managedInfo(pool)} />
+              <TokenDetailsCard pool={pool} />
               <ChecklistCard pool={pool} />
             </div>
             <div className="space-y-4">
@@ -86,6 +89,29 @@ function CheckIcon({ status }: { status: CheckItem['status'] }) {
 }
 
 function ChecklistCard({ pool }: { pool: Pool }) {
+  // Pool gerenciada: usa o Risk Checklist real do vault (flags da Beefy).
+  const beefy = beefyChecklist(managedInfo(pool)?.risks);
+  if (beefy.length > 0) {
+    return (
+      <Card className="mt-4 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-2">Risk Checklist</p>
+        <div className="mt-3 space-y-3">
+          {beefy.map((it) => (
+            <div key={it.label} className="flex items-start gap-2.5">
+              <CheckIcon status={it.ok ? 'ok' : 'warn'} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ftext">{it.label}</p>
+                <p className="text-[11px] leading-relaxed text-muted-2">{it.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 border-t border-edge-soft pt-2 text-[10px] leading-relaxed text-muted-2">
+          Checagens essenciais do vault. Passar nelas <b>não garante</b> segurança — perda por exploit/falha ainda pode acontecer. Serve pra ajudar a sua análise.
+        </p>
+      </Card>
+    );
+  }
   const items = buildChecklist(pool);
   const srcLabel: Record<CheckItem['source'], string> = { auto: 'automático', curado: 'curado', pendente: 'pendente' };
   return (
