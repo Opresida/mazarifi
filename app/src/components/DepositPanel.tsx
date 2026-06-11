@@ -147,7 +147,7 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
 
           {st === 'unsupported' && (
             <p className="mt-3 rounded-xl border border-gold/30 bg-gold/5 p-3 text-xs leading-relaxed text-muted">
-              ⏳ <b className="text-gold">Em breve</b> — essa oportunidade ainda não está disponível pra investir em 1 clique (é uma posição mais específica que estamos integrando). As outras oportunidades já estão prontas. 👍
+              ⏳ <b className="text-gold">Em breve</b> — essa oportunidade ainda não está no 1 clique. As outras já estão prontas. 👍
             </p>
           )}
 

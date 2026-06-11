@@ -62,7 +62,7 @@ export function PoolPage() {
               {pendleInfo(pool) && (
                 <Card className="border-gold/30 bg-gold/5 p-4">
                   <p className="text-sm font-semibold text-gold">⏳ Rende fixo até {new Date(pendleInfo(pool)!.expiry).toLocaleDateString('pt-BR')}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">Você trava um rendimento <b>fixo</b> até essa data (estilo renda fixa). No vencimento o rendimento para e seu valor fica resgatável 1:1 — <b className="text-ftext">quando o Autopilot estiver pronto, a gente rola pra próxima sozinho pra você</b>, sem você fazer nada.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">Você trava um rendimento <b>fixo</b> até essa data (estilo renda fixa). No vencimento o rendimento para e seu valor fica resgatável 1:1 — o <b className="text-ftext">Autopilot (Pro)</b> te avisa pra rolar pra próxima <b className="text-ftext">em 1 clique</b>.</p>
                 </Card>
               )}
               <MoneyProjector

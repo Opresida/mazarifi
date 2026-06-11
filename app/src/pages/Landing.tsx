@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { motion, useInView } from 'framer-motion';
 import Lenis from 'lenis';
-import { ArrowRight, ArrowUpRight, Anchor, ShieldCheck, Layers, Sparkles, Lock, Eye } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Anchor, ShieldCheck, Layers, Lock, Eye, Bot } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { WalletButton } from '../components/WalletButton';
 import { fetchBest } from '../api';
@@ -68,7 +68,7 @@ export function Landing() {
           <div>
             <Reveal>
               <span className="font-mono inline-flex items-center gap-2 rounded-full border border-lime/20 bg-lime/5 px-3 py-1 text-[11px] text-lime">
-                <span className="h-1.5 w-1.5 rounded-full bg-lime" /> DeFi honesto · construído na Base
+                <span className="h-1.5 w-1.5 rounded-full bg-lime" /> DeFi descomplicado · construído na Base
               </span>
             </Reveal>
             <Reveal delay={0.05}>
@@ -135,7 +135,7 @@ export function Landing() {
         <div className="mesh-grid pointer-events-none absolute inset-0" />
         <div className="relative mx-auto max-w-6xl px-5 py-20">
           <Reveal>
-            <p className="font-mono text-center text-xs uppercase tracking-[0.2em] text-lime">transparência de verdade</p>
+            <p className="font-mono text-center text-xs uppercase tracking-[0.2em] text-lime">transparência</p>
             <h2 className="font-display mx-auto mt-3 max-w-2xl text-center text-3xl font-bold leading-tight text-ftext sm:text-4xl">
               Nada de caixa-preta. Você vê tudo acontecer.
             </h2>
@@ -151,7 +151,7 @@ export function Landing() {
       <section id="taxas" className="bg-bone text-ink">
         <div className="mx-auto max-w-5xl px-5 py-20">
           <Reveal>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-700">honestidade radical</p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-700">tudo na mesa</p>
             <h2 className="font-display mt-3 max-w-2xl text-3xl font-bold leading-tight sm:text-4xl">
               Tudo que você ganha — e tudo que a gente cobra — numa tela só.
             </h2>
@@ -162,7 +162,7 @@ export function Landing() {
           <div className="mt-10 grid gap-5 sm:grid-cols-3">
             <LightCard icon={Eye} title="Número líquido, sempre" desc="Já descontamos a perda impermanente, as taxas e o gás. O que você vê é o que sobra pra você." />
             <LightCard icon={ShieldCheck} title="Checklist de risco aberto" desc="Cada cofre vem com as verificações de segurança na mesa. Sem letra miúda, sem asterisco." />
-            <LightCard icon={Layers} title="Taxa de 0,30%. Só na entrada." desc="Saída sempre grátis. E se não dá pra montar com segurança, a gente fala 'em breve' — não te empurra." />
+            <LightCard icon={Layers} title="Taxa de 0,30%. Só na entrada." desc="Saída sempre grátis. E o que ainda não dá pra montar com segurança fica como 'em breve'." />
           </div>
           <p className="font-mono mt-8 inline-flex items-center gap-2 rounded-lg bg-amber/15 px-3 py-1.5 text-[11px] text-amber-700">
             <span className="h-1.5 w-1.5 rounded-full bg-amber" /> Verde é o que você ganha. Âmbar é a gente te avisando. Você sempre sabe qual é qual.
@@ -178,7 +178,7 @@ export function Landing() {
             A gente monta a posição nos maiores protocolos.
           </h2>
           <p className="mt-4 max-w-2xl leading-relaxed text-muted">
-            Aave, Morpho, Compound, Fluid, cofres gerenciados e renda fixa. Se dá pra montar com segurança, a Mazari monta. Se ainda não dá, é <b className="text-amber">"em breve"</b> honesto.
+            Aave, Morpho, Compound, Fluid, cofres gerenciados e renda fixa. Se dá pra montar com segurança, a Mazari monta. Se ainda não dá, fica <b className="text-amber">em breve</b>.
           </p>
         </Reveal>
         <div className="mt-10 grid gap-px overflow-hidden rounded-3xl border border-edge bg-edge sm:grid-cols-3">
@@ -241,16 +241,19 @@ export function Landing() {
       {/* S6.5 — Universo DeFi da Mazari (Nortoken + Wallet em breve) */}
       <Ecosystem />
 
-      {/* S7 — Autopilot "em breve" */}
+      {/* S7 — Autopilot (assistido, real) + autonomia total em breve */}
       <section className="mx-auto max-w-4xl px-5 py-16">
         <Reveal>
-          <div className="relative overflow-hidden rounded-3xl border border-amber/25 bg-gradient-to-br from-amber/8 to-transparent p-8 text-center sm:p-12">
-            <span className="font-mono inline-flex items-center gap-2 rounded-full border border-amber/30 bg-amber/10 px-3 py-1 text-[11px] font-bold uppercase text-amber">
-              <Sparkles size={12} /> em construção
+          <div className="relative overflow-hidden rounded-3xl border border-lime/25 bg-gradient-to-br from-lime/[0.06] to-transparent p-8 text-center sm:p-12">
+            <span className="font-mono inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[11px] font-bold uppercase text-lime">
+              <Bot size={12} /> Autopilot · Pro
             </span>
-            <h2 className="font-display mt-4 text-2xl font-bold text-ftext sm:text-3xl">Em breve: o rendimento que se ajeita sozinho.</h2>
+            <h2 className="font-display mt-4 text-2xl font-bold text-ftext sm:text-3xl">A gente acha a pool melhor. Você troca em 1 clique.</h2>
             <p className="mx-auto mt-3 max-w-xl leading-relaxed text-muted">
-              Estamos construindo o <b className="text-amber">Autopilot</b> — ele vai trocar seu dinheiro de cofre sozinho quando aparecer um melhor. Ainda não está no ar, e a gente não finge que está. Quando ligar, você é o primeiro a saber.
+              O <b className="text-lime">Autopilot</b> vigia suas aplicações 24/7 e, quando aparece uma pool que rende mais, te avisa e monta a troca — você só <b className="text-ftext">assina</b>. A Mazari nunca move seu dinheiro sozinha.
+            </p>
+            <p className="font-mono mx-auto mt-4 max-w-md text-[11px] leading-relaxed text-amber">
+              ⏳ Em breve: trocar 100% no automático.
             </p>
           </div>
         </Reveal>
@@ -274,7 +277,7 @@ export function Landing() {
         <footer className="mx-auto max-w-6xl px-5 pb-12">
           <div className="flex flex-col items-center justify-between gap-4 border-t border-edge-soft pt-8 sm:flex-row">
             <Logo />
-            <p className="font-mono text-[11px] text-muted-2">DeFi honesto. Você no controle. · Construído na Base</p>
+            <p className="font-mono text-[11px] text-muted-2">Você no controle. · Construído na Base</p>
           </div>
           <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-2">
             Investir em cripto tem risco de perda. Rendimento passado não garante o futuro. A Mazari Fi é uma ferramenta <b>não-custodial</b> — você no controle. © 2026 Mazari Fi.
