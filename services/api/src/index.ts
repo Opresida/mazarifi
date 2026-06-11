@@ -2,10 +2,12 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { neon } from '@neondatabase/serverless';
-import { CHAINS, CHAIN_LIST } from '@mazarifi/chain';
+import { CHAINS, CHAIN_LIST, SOURCE_CHAINS, SOURCE_CHAIN_LIST, SOURCE_TOKENS, sourceTokenSet, NATIVE_TOKEN } from '@mazarifi/chain';
 
-/** Config da chain pelo nome (pool.chain / ?chain); fallback Base. */
+/** Config da chain DESTINO (pool) pelo nome; fallback Base. */
 const chainOf = (name: unknown) => CHAINS[String(name ?? 'Base')] ?? CHAINS.Base;
+/** Config da chain ORIGEM (de onde vem o dinheiro — ampla); fallback Base. */
+const srcOf = (name: unknown) => SOURCE_CHAINS[String(name ?? 'Base')] ?? SOURCE_CHAINS.Base;
 
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL ausente (.env)');
 const sql = neon(process.env.DATABASE_URL);
@@ -109,14 +111,14 @@ const LIFI_FEE = process.env.LIFI_FEE || '0.003'; // 0,3% (declarado na tela)
 /** Lê allowance de um ERC20 (server-side, RPC confiável — evita a RPC instável da carteira). token=USDC por padrão. */
 app.get('/api/zap/allowance', async (req, res) => {
   try {
-    const cfg = chainOf(req.query.chain);
+    const src = srcOf(req.query.chain); // RPC funciona em qualquer rede (origem ou destino)
     const owner = String(req.query.owner ?? '');
     const spender = String(req.query.spender ?? '');
-    const token = /^0x[0-9a-fA-F]{40}$/.test(String(req.query.token ?? '')) ? String(req.query.token) : cfg.usdc;
+    const token = /^0x[0-9a-fA-F]{40}$/.test(String(req.query.token ?? '')) ? String(req.query.token) : chainOf(req.query.chain).usdc;
     if (!/^0x[0-9a-fA-F]{40}$/.test(owner) || !/^0x[0-9a-fA-F]{40}$/.test(spender)) return res.status(400).json({ error: 'endereço inválido' });
     const pad = (h: string) => h.replace(/^0x/, '').toLowerCase().padStart(64, '0');
     const data = '0xdd62ed3e' + pad(owner) + pad(spender); // allowance(owner,spender)
-    const r = await fetch(cfg.rpc, {
+    const r = await fetch(src.rpc, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: token, data }, 'latest'] }),
@@ -129,52 +131,64 @@ app.get('/api/zap/allowance', async (req, res) => {
   }
 });
 
-/** Saldo de USDC do usuário EM CADA chain (pra detectar de onde trazer o dinheiro). */
-app.get('/api/usdc-balances', async (req, res) => {
+// O Enso devolve o ativo nativo com esse sentinela; mapeamos pro nativo da LiFi (0x0000…).
+const ENSO_NATIVE = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+/** FONTES DE FUNDO: o que o usuário tem de ATIVO CONHECIDO em QUALQUER rede de origem (a Mazari traz e investe). */
+app.get('/api/funding-sources', async (req, res) => {
   try {
+    if (!process.env.ENSO_API_KEY) return res.json({ sources: [] });
     const address = String(req.query.address ?? '');
     if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return res.status(400).json({ error: 'endereço inválido' });
-    const data = '0x70a08231' + address.replace(/^0x/, '').toLowerCase().padStart(64, '0'); // balanceOf(address)
-    const out: Record<string, number> = {};
-    await Promise.all(
-      CHAIN_LIST.map(async (cfg) => {
+    const perChain = await Promise.all(
+      SOURCE_CHAIN_LIST.map(async (cfg) => {
         try {
-          const r = await fetch(cfg.rpc, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: cfg.usdc, data }, 'latest'] }),
-          });
-          const j = (await r.json()) as { result?: string };
-          out[cfg.name] = j.result && j.result !== '0x' ? Number(BigInt(j.result)) / 1e6 : 0; // USDC = 6 casas
+          const allow = sourceTokenSet(cfg.chainId);
+          if (allow.size === 0) return [];
+          const br = await fetch(`${ENSO}/wallet/balances?chainId=${cfg.chainId}&eoaAddress=${address}&useEoa=true`, { headers: ensoHeaders() });
+          if (!br.ok) return [];
+          const balances = (await br.json()) as Array<{ token: string; amount: string; decimals: number; price: number; symbol?: string }>;
+          const out: Array<{ chain: string; token: string; symbol: string; amountUsd: number; amount: string; decimals: number }> = [];
+          for (const b of balances) {
+            let addr = (b.token || '').toLowerCase();
+            if (addr === ENSO_NATIVE || addr === NATIVE_TOKEN) addr = NATIVE_TOKEN; // normaliza nativo
+            const known = allow.get(addr);
+            if (!known) continue; // só ativos conhecidos/padrão (allowlist)
+            const amountUsd = (Number(b.amount) / 10 ** known.decimals) * (b.price || 0);
+            if (amountUsd < 1) continue;
+            out.push({ chain: cfg.name, token: known.address, symbol: known.symbol, amountUsd, amount: b.amount, decimals: known.decimals });
+          }
+          return out;
         } catch {
-          out[cfg.name] = 0;
+          return [];
         }
       }),
     );
-    res.json(out);
+    const sources = perChain.flat().sort((a, b) => b.amountUsd - a.amountUsd);
+    res.json({ sources });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });
   }
 });
 
-/** Ponte de USDC entre redes (LiFi escolhe a MELHOR rota). Rebate só com LIFI_INTEGRATOR (graceful). */
+/** Ponte de QUALQUER ativo conhecido (origem) → USDC na rede da pool (LiFi swap+bridge, melhor rota). */
 app.get('/api/bridge/quote', async (req, res) => {
   try {
-    const fromCfg = chainOf(req.query.fromChain);
+    const fromCfg = srcOf(req.query.fromChain);
     const toCfg = chainOf(req.query.toChain);
     const fromAddress = String(req.query.fromAddress ?? '');
-    const amountUsdc = Number(req.query.amountUsdc ?? 0);
-    if (!/^0x[0-9a-fA-F]{40}$/.test(fromAddress) || !(amountUsdc > 0)) return res.status(400).json({ error: 'parâmetros faltando' });
-    if (fromCfg.name === toCfg.name) return res.json({ supported: false, reason: 'mesma rede' });
-    const amount = BigInt(Math.floor(amountUsdc * 1e6)).toString();
+    const fromToken = String(req.query.fromToken ?? '');
+    const fromAmount = String(req.query.fromAmount ?? '');
+    if (!/^0x[0-9a-fA-F]{40}$/.test(fromAddress) || !/^0x[0-9a-fA-F]{40}$/.test(fromToken) || !/^\d+$/.test(fromAmount)) return res.status(400).json({ error: 'parâmetros faltando' });
+    if (fromCfg.chainId === toCfg.chainId) return res.json({ supported: false, reason: 'mesma rede' });
     const q = new URLSearchParams({
       fromChain: String(fromCfg.chainId),
       toChain: String(toCfg.chainId),
-      fromToken: fromCfg.usdc,
+      fromToken,
       toToken: toCfg.usdc,
       fromAddress,
-      fromAmount: amount,
+      fromAmount,
     });
     const feePct = LIFI_INTEGRATOR ? Number(LIFI_FEE) * 100 : 0;
     if (LIFI_INTEGRATOR) {
@@ -213,18 +227,18 @@ app.get('/api/bridge/deposit-quote', async (req, res) => {
     if (process.env.ZAP_ENABLED !== 'true' || !process.env.ENSO_API_KEY) return res.json({ supported: false, reason: 'zap desativado' });
     const poolKey = String(req.query.poolKey ?? '');
     const fromAddress = String(req.query.fromAddress ?? '');
-    const amountUsdc = Number(req.query.amountUsdc ?? 0);
-    if (!poolKey || !/^0x[0-9a-fA-F]{40}$/.test(fromAddress) || !(amountUsdc > 0)) return res.status(400).json({ error: 'parâmetros faltando' });
+    const fromToken = String(req.query.fromToken ?? '');
+    const fromAmount = String(req.query.fromAmount ?? '');
+    if (!poolKey || !/^0x[0-9a-fA-F]{40}$/.test(fromAddress) || !/^0x[0-9a-fA-F]{40}$/.test(fromToken) || !/^\d+$/.test(fromAmount)) return res.status(400).json({ error: 'parâmetros faltando' });
 
     const [pool] = await sql`SELECT project, chain, raw FROM pools WHERE pool_key = ${poolKey} LIMIT 1`;
     if (!pool) return res.json({ supported: false, reason: 'pool não encontrada' });
     const toCfg = chainOf(pool.chain);
-    const fromCfg = chainOf(req.query.fromChain);
-    if (fromCfg.name === toCfg.name) return res.json({ supported: false, reason: 'mesma rede' });
+    const fromCfg = srcOf(req.query.fromChain);
+    if (fromCfg.chainId === toCfg.chainId) return res.json({ supported: false, reason: 'mesma rede' });
 
-    // 1) cota a ponte só pra saber QUANTO USDC chega no destino (a saída da LiFi é confiável; a do contractCall não).
-    const amount = BigInt(Math.floor(amountUsdc * 1e6)).toString();
-    const bq = new URLSearchParams({ fromChain: String(fromCfg.chainId), toChain: String(toCfg.chainId), fromToken: fromCfg.usdc, toToken: toCfg.usdc, fromAddress, fromAmount: amount });
+    // 1) cota a ponte (ativo origem → USDC destino) só pra saber QUANTO USDC chega (a saída do contractCall não é confiável).
+    const bq = new URLSearchParams({ fromChain: String(fromCfg.chainId), toChain: String(toCfg.chainId), fromToken, toToken: toCfg.usdc, fromAddress, fromAmount });
     if (LIFI_INTEGRATOR) { bq.set('integrator', LIFI_INTEGRATOR); bq.set('fee', LIFI_FEE); }
     const br = await fetch(`${LIFI}/quote?${bq.toString()}`);
     if (!br.ok) return res.json({ supported: false, reason: `LiFi ${br.status}` });
@@ -237,9 +251,9 @@ app.get('/api/bridge/deposit-quote', async (req, res) => {
     const z = await buildEnsoZap(pool as { project: string; raw: EnsoRaw }, toCfg, destAmount, fromAddress);
     if ('error' in z) return res.json({ supported: false, reason: z.error });
 
-    // 3) LiFi contractCalls: ponte + executa o zap Enso no destino → 1 tx assinável na origem.
+    // 3) LiFi contractCalls: swap+ponte do ativo origem + executa o zap Enso no destino → 1 tx assinável na origem.
     const body = {
-      fromChain: String(fromCfg.chainId), fromToken: fromCfg.usdc, fromAddress,
+      fromChain: String(fromCfg.chainId), fromToken, fromAddress,
       toChain: String(toCfg.chainId), toToken: toCfg.usdc, toAmount: destAmount,
       ...(LIFI_INTEGRATOR ? { integrator: LIFI_INTEGRATOR, fee: LIFI_FEE } : {}),
       contractCalls: [{ fromAmount: destAmount, fromTokenAddress: toCfg.usdc, toContractAddress: z.to, toContractCallData: z.data, toContractGasLimit: '950000' }],

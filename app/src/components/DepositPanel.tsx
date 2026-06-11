@@ -3,10 +3,10 @@ import { Link } from 'wouter';
 import { Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { Pool, NetworkMap } from '../types';
 import { useWallet, switchToChain, sendTx } from '../lib/wallet';
-import { quoteZap, usdcAllowance, approveUsdc, type ZapQuote } from '../lib/zap';
-import { fetchUsdcBalances, quoteCrossDeposit, type CrossDepositQuote } from '../lib/bridge';
+import { quoteZap, usdcAllowance, approveUsdc, tokenAllowance, approveToken, type ZapQuote } from '../lib/zap';
+import { fetchFundingSources, sourceAmountForUsd, quoteCrossDeposit, type FundingSource, type CrossDepositQuote } from '../lib/bridge';
 import { managedInfo } from '../lib/pool';
-import { chainCfg } from '../lib/chains';
+import { chainCfg, NATIVE } from '../lib/chains';
 import { Card } from './atoms';
 
 type St = 'idle' | 'quoting' | 'ready' | 'unsupported' | 'approving' | 'depositing' | 'done';
@@ -24,19 +24,19 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
   const gasUsd = quote?.gas && n?.gas_price_gwei && n?.eth_usd ? (Number(quote.gas) * n.gas_price_gwei) / 1e9 * n.eth_usd : null;
   const highImpact = impactPct != null && impactPct > 1;
 
-  // AUTO: detecta o USDC do usuário por chain e aponta de onde trazer (ponte) sozinho.
-  const [balances, setBalances] = useState<Record<string, number> | null>(null);
-  const loadBalances = useCallback(async () => {
-    if (address) setBalances(await fetchUsdcBalances(address));
+  // AUTO: "a Mazari resolve" — acha o dinheiro do usuário em QUALQUER rede/ativo conhecido e aponta de onde trazer.
+  const [sources, setSources] = useState<FundingSource[] | null>(null);
+  const loadSources = useCallback(async () => {
+    if (address) setSources(await fetchFundingSources(address));
   }, [address]);
-  useEffect(() => { loadBalances(); }, [loadBalances]);
+  useEffect(() => { loadSources(); }, [loadSources]);
 
-  const poolBal = balances?.[pool.chain] ?? 0;
-  const srcEntry = balances ? Object.entries(balances).filter(([c]) => c !== pool.chain).sort((a, b) => b[1] - a[1])[0] : undefined;
-  const srcChain = srcEntry?.[0];
-  const srcBal = srcEntry?.[1] ?? 0;
-  // precisa de ponte: não tem USDC suficiente na rede da pool, mas tem em outra
-  const needsBridge = !!address && balances != null && poolBal < amount && srcBal > poolBal && !!srcChain;
+  // USDC já na rede da pool? (caminho normal, sem ponte)
+  const poolUsdc = sources?.find((s) => s.chain === pool.chain && s.symbol === 'USDC')?.amountUsd ?? 0;
+  // melhor fonte em OUTRA rede (qualquer ativo conhecido), por valor
+  const bestSource = (sources ?? []).filter((s) => s.chain !== pool.chain).sort((a, b) => b.amountUsd - a.amountUsd)[0];
+  // precisa trazer de fora: não tem USDC bastante na rede da pool, mas tem dinheiro em outra rede
+  const needsBridge = !!address && sources != null && poolUsdc < amount && !!bestSource;
 
   async function doQuote() {
     if (!address) return;
@@ -136,8 +136,8 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
           </div>
 
           {st !== 'ready' && st !== 'approving' && st !== 'depositing' && (
-            needsBridge && srcChain ? (
-              <BridgeCard poolKey={pool.pool_key} fromChain={srcChain} toChain={pool.chain} amount={amount} srcBal={srcBal} address={address!} onBridged={loadBalances} />
+            needsBridge && bestSource ? (
+              <BridgeCard poolKey={pool.pool_key} toChain={pool.chain} source={bestSource} targetUsd={amount} address={address!} onBridged={loadSources} />
             ) : (
               <button onClick={doQuote} disabled={st === 'quoting' || !(amount > 0)} className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 px-4 py-2.5 text-sm font-semibold text-lime hover:bg-lime/15 disabled:opacity-60">
                 {st === 'quoting' ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Simulando…</span> : 'Simular depósito'}
@@ -191,18 +191,20 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
 
 type BSt = 'idle' | 'quoting' | 'ready' | 'approving' | 'bridging' | 'done';
 
-/** 1 CLIQUE cross-chain: a gente achou o USDC em outra rede e, num clique só, faz a ponte E investe no vault (LiFi + Enso no destino). */
-function BridgeCard({ poolKey, fromChain, toChain, amount, srcBal, address, onBridged }: { poolKey: string; fromChain: string; toChain: string; amount: number; srcBal: number; address: string; onBridged: () => void }) {
+/** "A Mazari resolve": achamos o dinheiro do cliente em qualquer rede/ativo conhecido → num clique, swap+ponte+investe no vault. */
+function BridgeCard({ poolKey, toChain, source, targetUsd, address, onBridged }: { poolKey: string; toChain: string; source: FundingSource; targetUsd: number; address: string; onBridged: () => void }) {
   const [bst, setBst] = useState<BSt>('idle');
   const [bq, setBq] = useState<CrossDepositQuote | null>(null);
   const [berr, setBerr] = useState<string | null>(null);
-  const amt = Math.min(amount, srcBal);
+  const usd = Math.min(targetUsd, source.amountUsd);
+  const fromAmount = sourceAmountForUsd(source, usd);
+  const isNative = source.token.toLowerCase() === NATIVE;
 
   async function doQuote() {
     setBerr(null);
     setBst('quoting');
     try {
-      const q = await quoteCrossDeposit(poolKey, fromChain, amt, address);
+      const q = await quoteCrossDeposit(poolKey, source.chain, source.token, fromAmount, address);
       if (!q.supported) { setBerr(`Indisponível em 1 clique (${q.reason}).`); setBst('idle'); return; }
       setBq(q);
       setBst('ready');
@@ -216,14 +218,14 @@ function BridgeCard({ poolKey, fromChain, toChain, amount, srcBal, address, onBr
     if (!bq?.to || !bq.data || !bq.spender) return;
     setBerr(null);
     try {
-      await switchToChain(fromChain);
-      const need = BigInt(Math.floor(amt * 1e6));
-      if ((await usdcAllowance(address, bq.spender, fromChain)) < need) {
+      await switchToChain(source.chain);
+      const need = BigInt(fromAmount);
+      if (!isNative && (await tokenAllowance(address, bq.spender, source.token, source.chain)) < need) {
         setBst('approving');
-        await approveUsdc(bq.spender, fromChain);
+        await approveToken(source.token, bq.spender);
         let ok = false;
         for (let i = 0; i < 25; i++) {
-          if ((await usdcAllowance(address, bq.spender, fromChain)) >= need) { ok = true; break; }
+          if ((await tokenAllowance(address, bq.spender, source.token, source.chain)) >= need) { ok = true; break; }
           await new Promise((r) => setTimeout(r, 3000));
         }
         if (!ok) { setBerr('A aprovação não confirmou — clique de novo.'); setBst('ready'); return; }
@@ -231,7 +233,7 @@ function BridgeCard({ poolKey, fromChain, toChain, amount, srcBal, address, onBr
       setBst('bridging');
       await sendTx({ to: bq.to, data: bq.data, value: bq.value });
       setBst('done');
-      setTimeout(onBridged, 35000); // ~30s pro USDC atravessar e entrar no vault no destino
+      setTimeout(onBridged, 35000); // ~30s pro dinheiro atravessar e entrar no vault no destino
     } catch (e) {
       const code = (e as { code?: number })?.code;
       setBerr(code === 4001 ? 'Você cancelou.' : (e as Error)?.message ?? 'erro na transação');
@@ -242,12 +244,12 @@ function BridgeCard({ poolKey, fromChain, toChain, amount, srcBal, address, onBr
   return (
     <div className="mt-3 rounded-xl border border-lime/30 bg-lime/5 p-3 text-[11px] leading-relaxed text-muted">
       {bst === 'done' ? (
-        <p className="text-lime">✅ <b>Em ~{bq?.durationS ?? 30}s seu USDC entra direto no vault da {toChain}</b> — 1 assinatura, mais nada. Acompanhe em "Minhas aplicações".</p>
+        <p className="text-lime">✅ <b>Em ~{bq?.durationS ?? 30}s seu dinheiro entra direto no vault da {toChain}</b> — 1 assinatura, mais nada. Acompanhe em "Minhas aplicações".</p>
       ) : (
         <>
-          <p>💡 <b className="text-ftext">Seu USDC está na {fromChain}</b> (${srcBal.toFixed(2)}). A gente traz pra <b className="text-ftext">{toChain}</b> <b className="text-ftext">e investe no vault — tudo num clique só.</b></p>
+          <p>💡 <b className="text-ftext">A Mazari achou seu dinheiro: ${source.amountUsd.toFixed(2)} em {source.symbol} ({source.chain})</b>. A gente traz pra <b className="text-ftext">{toChain}</b> <b className="text-ftext">e investe no vault — tudo num clique, você não faz nada manual.</b></p>
           {bq && (
-            <p className="mt-1.5">Investe ~<b className="text-ftext">${bq.depositUsd?.toFixed(2)}</b> no vault da {toChain} · ~{bq.durationS ?? 30}s{bq.feePct ? ` · taxa Mazari ${bq.feePct.toFixed(2)}%` : ''} <span className="text-muted-2">(via {bq.tool})</span>.</p>
+            <p className="mt-1.5">Usa ~<b className="text-ftext">${usd.toFixed(2)}</b> de {source.symbol} → investe ~<b className="text-ftext">${bq.depositUsd?.toFixed(2)}</b> no vault · ~{bq.durationS ?? 30}s{bq.feePct ? ` · taxa Mazari ${bq.feePct.toFixed(2)}%` : ''} <span className="text-muted-2">(via {bq.tool})</span>.</p>
           )}
           <button
             onClick={bst === 'ready' ? doDeposit : doQuote}
@@ -255,11 +257,11 @@ function BridgeCard({ poolKey, fromChain, toChain, amount, srcBal, address, onBr
             className="mt-2 w-full rounded-lg bg-lime px-3 py-2 text-xs font-semibold text-ink hover:bg-lime-bright disabled:opacity-60"
           >
             {bst === 'quoting' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Montando a melhor rota…</span>
-              : bst === 'approving' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Aprovando USDC…</span>
+              : bst === 'approving' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Aprovando {source.symbol}…</span>
               : bst === 'bridging' ? <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Confirme na carteira…</span>
-              : bst === 'ready' ? `Depositar $${amt.toFixed(2)} com 1 clique` : `Depositar com 1 clique (trazendo da ${fromChain})`}
+              : bst === 'ready' ? `Investir $${usd.toFixed(2)} com 1 clique` : `Investir com 1 clique (do seu ${source.symbol} na ${source.chain})`}
           </button>
-          <p className="mt-1.5 text-[10px] text-muted-2">Se a rede variar muito, seu USDC chega na {toChain} e você finaliza o depósito normal — nada se perde.</p>
+          <p className="mt-1.5 text-[10px] text-muted-2">A Mazari cuida da rede e da troca pra você. Se a rede variar muito, seu USDC chega na {toChain} e você finaliza — nada se perde.</p>
           {berr && <p className="mt-1.5 text-rose">{berr}</p>}
         </>
       )}

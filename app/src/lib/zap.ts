@@ -41,13 +41,17 @@ export async function usdcAllowance(owner: string, spender: string, chain: strin
 
 /** Aprova o USDC da chain pro spender (uma vez). Retorna o hash. */
 export async function approveUsdc(spender: string, chain: string): Promise<string> {
-  return sendTx({ to: chainCfg(chain).usdc, data: encodeApprove(spender, MAX_UINT) });
+  const usdc = chainCfg(chain).usdc;
+  if (!usdc) throw new Error(`sem USDC configurado pra ${chain}`);
+  return sendTx({ to: usdc, data: encodeApprove(spender, MAX_UINT) });
 }
 
-/** Allowance de um token qualquer (pro saque: aprovar a posição pro router). */
-export async function tokenAllowance(owner: string, spender: string, token: string): Promise<bigint> {
+/** Allowance de um token qualquer numa chain (pro saque OU pra origem do cross-chain). */
+export async function tokenAllowance(owner: string, spender: string, token: string, chain?: string): Promise<bigint> {
   try {
-    const r = await fetch(`/api/zap/allowance?owner=${owner}&spender=${spender}&token=${token}`);
+    const q = new URLSearchParams({ owner, spender, token });
+    if (chain) q.set('chain', chain);
+    const r = await fetch(`/api/zap/allowance?${q.toString()}`);
     if (!r.ok) return 0n;
     const j = (await r.json()) as { allowance?: string };
     return BigInt(j.allowance && j.allowance !== '0x' ? j.allowance : '0x0');
@@ -56,7 +60,7 @@ export async function tokenAllowance(owner: string, spender: string, token: stri
   }
 }
 
-/** Aprova um token qualquer pro spender. */
+/** Aprova um token qualquer pro spender (na chain atual da carteira). */
 export async function approveToken(token: string, spender: string): Promise<string> {
   return sendTx({ to: token, data: encodeApprove(spender, MAX_UINT) });
 }
