@@ -99,6 +99,22 @@ app.get('/api/admin/metrics', async (_req, res) => {
 const ENSO = 'https://api.enso.finance/api/v1';
 const ensoHeaders = () => ({ Authorization: `Bearer ${process.env.ENSO_API_KEY}` });
 
+/** Fetch com RETRY + backoff — as APIs (Enso) dão erro transiente/rate-limit; o retry deixa a montagem CONFIÁVEL. */
+async function fetchRetry(url: string, init: RequestInit = {}, tries = 4): Promise<Response> {
+  let last: Response | null = null;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, init);
+      if (r.ok) return r;
+      last = r;
+    } catch {
+      /* rede — tenta de novo */
+    }
+    if (i < tries - 1) await new Promise((res) => setTimeout(res, 400 * (i + 1))); // 0.4s, 0.8s, 1.2s
+  }
+  return last ?? new Response(null, { status: 599 });
+}
+
 // Receita: taxa da Mazari (integrador Enso) — 0,30% na ENTRADA, saída 0% (spec §2.1). Sem MAZARI_TREASURY, sem taxa (graceful).
 const ZAP_FEE_BPS = process.env.ZAP_FEE_BPS || '30'; // 30 bps = 0,30%
 const MAZARI_TREASURY = process.env.MAZARI_TREASURY; // endereço que recebe a taxa
@@ -347,22 +363,23 @@ app.get('/api/zap/withdraw', async (req, res) => {
   }
 });
 
-function ensoSlug(project: string): string | null {
+/** Slugs CANDIDATOS do Enso por projeto (alguns têm várias variantes — ex.: Morpho tem 3). Tentamos todos até montar. */
+function ensoSlugs(project: string): string[] {
   const p = project.toLowerCase();
-  if (p.includes('aerodrome')) return 'aerodrome';
-  if (p.includes('uniswap-v3') || p.includes('uniswap-v4')) return 'uniswap-v3';
-  if (p.includes('uniswap-v2') || p.includes('sushiswap')) return 'uniswap-v2';
-  if (p.includes('morpho') || p.includes('gauntlet')) return 'morpho-blue-vaults'; // gauntlet = curador Morpho
-  if (p.includes('curve')) return 'curve-dex';
-  if (p.includes('balancer-v3')) return 'balancer-v3';
-  if (p.includes('balancer')) return 'balancer-v2';
-  if (p.includes('aave')) return 'aave-v3';
-  if (p.includes('spark')) return 'spark-lend';
-  if (p.includes('moonwell')) return 'moonwell';
-  if (p.includes('fluid')) return 'fluid-lending';
-  if (p.includes('compound')) return 'compound-v3';
-  if (p.includes('pendle')) return 'pendle-markets';
-  return null;
+  if (p.includes('aerodrome')) return ['aerodrome'];
+  if (p.includes('uniswap-v3') || p.includes('uniswap-v4')) return ['uniswap-v3'];
+  if (p.includes('uniswap-v2') || p.includes('sushiswap')) return ['uniswap-v2'];
+  if (p.includes('morpho') || p.includes('gauntlet')) return ['morpho-blue-vaults', 'morpho-vaults-v2', 'morpho-markets-v1']; // gauntlet = curador Morpho
+  if (p.includes('curve')) return ['curve-dex'];
+  if (p.includes('balancer-v3')) return ['balancer-v3'];
+  if (p.includes('balancer')) return ['balancer-v2'];
+  if (p.includes('aave')) return ['aave-v3'];
+  if (p.includes('spark')) return ['spark-lend'];
+  if (p.includes('moonwell')) return ['moonwell'];
+  if (p.includes('fluid')) return ['fluid-lending'];
+  if (p.includes('compound')) return ['compound-v3', 'reserve-wrapped-compound-v3'];
+  if (p.includes('pendle')) return ['pendle-markets'];
+  return [];
 }
 
 // Projetos que conseguimos ZAPAR (executar/monetizar) — sincronizado com ensoSlug. Usado pra esconder o resto do ranking.
@@ -386,14 +403,18 @@ async function buildEnsoZap(
   if (managedVault) {
     lp = { address: managedVault, symbol: pool.raw?.assets?.join('/') ?? null };
   } else {
-    const slug = ensoSlug(pool.project);
+    const slugs = ensoSlugs(pool.project);
     const underlying = pool.raw?.underlyingTokens ?? [];
-    if (!slug || underlying.length === 0) return { error: 'protocolo sem zap' };
-    const tq = new URLSearchParams({ chainId: String(cfg.chainId), protocolSlug: slug, page: '1' });
-    for (const u of underlying) tq.append('underlyingTokens', u);
-    const tr = await fetch(`${ENSO}/tokens?${tq.toString()}`, { headers: ensoHeaders() });
-    const tj = (await tr.json()) as { data?: Array<{ address: string; symbol?: string | null }> };
-    lp = tj.data?.[0];
+    if (slugs.length === 0 || underlying.length === 0) return { error: 'protocolo sem zap' };
+    // tenta cada slug candidato até achar a posição (ex.: Morpho tem 3 variantes)
+    for (const slug of slugs) {
+      const tq = new URLSearchParams({ chainId: String(cfg.chainId), protocolSlug: slug, page: '1' });
+      for (const u of underlying) tq.append('underlyingTokens', u);
+      const tr = await fetchRetry(`${ENSO}/tokens?${tq.toString()}`, { headers: ensoHeaders() });
+      if (!tr.ok) continue;
+      const tj = (await tr.json()) as { data?: Array<{ address: string; symbol?: string | null }> };
+      if (tj.data?.[0]?.address) { lp = tj.data[0]; break; }
+    }
   }
   if (!lp?.address) return { error: 'posição não encontrada no Enso' };
 
@@ -412,7 +433,7 @@ async function buildEnsoZap(
     rq.set('fee', ZAP_FEE_BPS);
     rq.set('feeReceiver', MAZARI_TREASURY);
   }
-  const rr = await fetch(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
+  const rr = await fetchRetry(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
   if (!rr.ok) return { error: `Enso route ${rr.status}` };
   const d = (await rr.json()) as { tx?: { to?: string; data?: string; value?: string }; amountOut?: string; gas?: string; priceImpact?: number };
   if (!d.tx?.to || !d.tx.data) return { error: 'Enso sem tx' };
