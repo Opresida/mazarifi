@@ -68,7 +68,7 @@ export function Landing() {
           <div>
             <Reveal>
               <span className="font-mono inline-flex items-center gap-2 rounded-full border border-lime/20 bg-lime/5 px-3 py-1 text-[11px] text-lime">
-                <span className="h-1.5 w-1.5 rounded-full bg-lime" /> DeFi descomplicado · construído na Base
+                <span className="h-1.5 w-1.5 rounded-full bg-lime" /> Descomplicando o DeFi · construído na Base
               </span>
             </Reveal>
             <Reveal delay={0.05}>
