@@ -29,6 +29,7 @@ const FEATURES = [
 ];
 
 export function Ecosystem() {
+  const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   return (
     <section className="relative overflow-hidden border-y border-edge bg-void">
       <div className="mesh-grid pointer-events-none absolute inset-0" />
@@ -51,7 +52,17 @@ export function Ecosystem() {
 
         {/* trilho do ecossistema: 3 produtos conectados */}
         <div className="relative mx-auto mt-12 grid max-w-3xl grid-cols-3 gap-3">
-          <div className="absolute left-[16%] right-[16%] top-7 hidden h-px sm:block" style={{ background: 'repeating-linear-gradient(90deg, rgba(138,143,163,.4) 0 6px, transparent 6px 12px)' }} />
+          <div className="absolute left-[16%] right-[16%] top-7 hidden h-px sm:block">
+            <div className="flow-line absolute inset-0" />
+            {!reduce && (
+              <motion.div
+                className="absolute top-1/2 h-[3px] w-14 -translate-y-1/2 rounded-full"
+                style={{ background: 'linear-gradient(90deg, transparent, var(--color-lime), transparent)', boxShadow: '0 0 8px rgba(52,226,155,.75)' }}
+                animate={{ left: ['-10%', '100%'] }}
+                transition={{ duration: 2.8, repeat: Infinity, repeatDelay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              />
+            )}
+          </div>
           <EcoNode tone="lime" label="Mazari Fi" sub="você está aqui" img="/logo-icon.png" />
           <EcoNode tone="emerald" label="Nortoken" sub="lance seu token" cube />
           <EcoNode tone="amber" label="Mazari Wallet" sub="em breve" icon={Wallet} dim />
