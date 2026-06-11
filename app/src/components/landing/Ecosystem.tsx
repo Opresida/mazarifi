@@ -52,7 +52,7 @@ export function Ecosystem() {
 
         {/* trilho do ecossistema: 3 produtos conectados */}
         <div className="relative mx-auto mt-12 grid max-w-3xl grid-cols-3 gap-3">
-          <div className="absolute left-[16%] right-[16%] top-7 hidden h-px sm:block">
+          <div className="absolute left-[16%] right-[16%] top-7 h-px">
             <div className="flow-line absolute inset-0" />
             {!reduce && (
               <motion.div
