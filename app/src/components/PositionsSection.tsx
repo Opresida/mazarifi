@@ -5,6 +5,7 @@ import { fetchPositions } from '../api';
 import { useWallet, switchToChain, sendTx } from '../lib/wallet';
 import { quoteWithdraw, tokenAllowance, approveToken, type WithdrawQuote } from '../lib/zap';
 import { chainCfg } from '../lib/chains';
+import { friendlyError } from '../lib/txError';
 import { Card } from './atoms';
 import { fmtUsd } from '../lib/format';
 import { WalletButton } from './WalletButton';
@@ -83,7 +84,7 @@ function WithdrawCard({ position, address, net, onDone }: { position: Position; 
       setQuote(q);
       setSt('ready');
     } catch (e) {
-      setErr((e as Error)?.message ?? 'erro');
+      setErr(friendlyError(e));
       setSt('idle');
     }
   }
@@ -117,8 +118,7 @@ function WithdrawCard({ position, address, net, onDone }: { position: Position; 
       setSt('done');
       setTimeout(onDone, 4000);
     } catch (e) {
-      const code = (e as { code?: number })?.code;
-      setErr(code === 4001 ? 'Você cancelou.' : (e as Error)?.message ?? 'erro na transação');
+      setErr(friendlyError(e));
       setSt('ready');
     }
   }

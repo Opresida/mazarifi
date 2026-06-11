@@ -7,6 +7,7 @@ import { quoteZap, usdcAllowance, approveUsdc, tokenAllowance, approveToken, typ
 import { fetchFundingSources, sourceAmountForUsd, quoteCrossDeposit, type FundingSource, type CrossDepositQuote } from '../lib/bridge';
 import { managedInfo } from '../lib/pool';
 import { chainCfg, NATIVE } from '../lib/chains';
+import { friendlyError } from '../lib/txError';
 import { Card } from './atoms';
 
 type St = 'idle' | 'quoting' | 'ready' | 'unsupported' | 'approving' | 'depositing' | 'done';
@@ -48,7 +49,7 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
       setQuote(q);
       setSt(q.supported ? 'ready' : 'unsupported');
     } catch (e) {
-      setErr((e as Error)?.message ?? 'erro');
+      setErr(friendlyError(e));
       setSt('idle');
     }
   }
@@ -81,8 +82,7 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
       setTxHash(hash);
       setSt('done');
     } catch (e) {
-      const code = (e as { code?: number })?.code;
-      setErr(code === 4001 ? 'Você cancelou a transação.' : (e as Error)?.message ?? 'erro na transação');
+      setErr(friendlyError(e));
       setSt('ready');
     }
   }
@@ -146,8 +146,8 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
           )}
 
           {st === 'unsupported' && (
-            <p className="mt-3 rounded-xl border border-edge bg-ink/40 p-3 text-xs leading-relaxed text-muted-2">
-              ⚠ Depósito em 1 clique indisponível pra essa pool ({quote?.reason}). Use o <b>passo a passo</b> abaixo pra entrar no app do protocolo.
+            <p className="mt-3 rounded-xl border border-gold/30 bg-gold/5 p-3 text-xs leading-relaxed text-muted">
+              ⏳ <b className="text-gold">Em breve</b> — essa oportunidade ainda não está disponível pra investir em 1 clique (é uma posição mais específica que estamos integrando). As outras oportunidades já estão prontas. 👍
             </p>
           )}
 
@@ -209,7 +209,7 @@ function BridgeCard({ poolKey, toChain, source, targetUsd, address, onBridged }:
       setBq(q);
       setBst('ready');
     } catch (e) {
-      setBerr((e as Error)?.message ?? 'erro');
+      setBerr(friendlyError(e));
       setBst('idle');
     }
   }
@@ -235,8 +235,7 @@ function BridgeCard({ poolKey, toChain, source, targetUsd, address, onBridged }:
       setBst('done');
       setTimeout(onBridged, 35000); // ~30s pro dinheiro atravessar e entrar no vault no destino
     } catch (e) {
-      const code = (e as { code?: number })?.code;
-      setBerr(code === 4001 ? 'Você cancelou.' : (e as Error)?.message ?? 'erro na transação');
+      setBerr(friendlyError(e));
       setBst('ready');
     }
   }
