@@ -8,6 +8,7 @@ import { fetchFundingSources, sourceAmountForUsd, quoteCrossDeposit, type Fundin
 import { managedInfo } from '../lib/pool';
 import { chainCfg, NATIVE } from '../lib/chains';
 import { friendlyError } from '../lib/txError';
+import { recordDeposit } from '../lib/ledger';
 import { Card } from './atoms';
 
 type St = 'idle' | 'quoting' | 'ready' | 'unsupported' | 'approving' | 'depositing' | 'done';
@@ -80,6 +81,7 @@ export function DepositPanel({ pool, net }: { pool: Pool; net: NetworkMap | null
       setSt('depositing');
       const hash = await sendTx({ to: quote.to, data: quote.data, value: quote.value });
       setTxHash(hash);
+      if (quote.lpTarget) recordDeposit(quote.lpTarget, pool.chain, amount); // aporte → Saúde da Aplicação
       setSt('done');
     } catch (e) {
       setErr(friendlyError(e));
@@ -232,6 +234,7 @@ function BridgeCard({ poolKey, toChain, source, targetUsd, address, onBridged }:
       }
       setBst('bridging');
       await sendTx({ to: bq.to, data: bq.data, value: bq.value });
+      if (bq.lpTarget) recordDeposit(bq.lpTarget, toChain, bq.depositUsd ?? usd); // aporte → Saúde da Aplicação
       setBst('done');
       setTimeout(onBridged, 35000); // ~30s pro dinheiro atravessar e entrar no vault no destino
     } catch (e) {

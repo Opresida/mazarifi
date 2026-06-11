@@ -4,7 +4,7 @@ import type { NetworkMap } from '../types';
 import { fetchNetwork } from '../api';
 import { Shell, type NavItem } from '../components/Shell';
 import { PositionsSection } from '../components/PositionsSection';
-import { AutopilotPanel } from '../components/AutopilotPanel';
+import { HealthPanel } from '../components/HealthPanel';
 import { WalletButton } from '../components/WalletButton';
 import { useWallet } from '../lib/wallet';
 
@@ -27,7 +27,7 @@ export function MinhaAplicacaoPage() {
       <p className="mt-1 text-sm text-muted">O que você tem aplicado nas pools (todas as redes) — com o valor de hoje e o botão de sacar.</p>
       {address && (
         <div className="mt-5">
-          <AutopilotPanel address={address} />
+          <HealthPanel address={address} />
         </div>
       )}
       <div className="mt-5">

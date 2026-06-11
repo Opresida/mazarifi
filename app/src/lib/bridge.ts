@@ -42,6 +42,7 @@ export interface CrossDepositQuote {
   tool?: string | null;
   depositUsd?: number; // USDC que entra no vault no destino
   vaultSymbol?: string | null;
+  lpTarget?: string | null; // token da posição no destino (pro ledger de aporte)
   feePct?: number; // rebate Mazari da ponte (0 se não configurado)
 }
 

@@ -1,14 +1,22 @@
-/** Autopilot assistido (não-custodial): vigia as posições e sugere trocar pra uma pool melhor. */
-export interface AutopilotSuggestion {
-  from: { token: string; symbol: string | null; protocol: string | null; valueUsd: number; amount: string; decimals: number; chain: string; annualPct: number };
-  to: { poolKey: string; symbol: string | null; project: string; annualPct: number };
-  deltaPct: number;
-  extraGainUsdYear: number;
-  switchCostUsd: number;
-  paybackDays: number;
+/** Saúde da Aplicação + Autopilot assistido (não-custodial). */
+export interface AutopilotItem {
+  from: {
+    token: string;
+    symbol: string | null;
+    protocol: string | null;
+    valueUsd: number;
+    amount: string;
+    decimals: number;
+    chain: string;
+    type: 'emprestimo' | 'gerenciada' | 'troca';
+    annualPct: number;
+  };
+  metrics: { return15d: number | null; il15d: number | null; riskScore: number | null; volLow: number | null; volHigh: number | null };
+  best: { poolKey: string; symbol: string | null; project: string; annualPct: number; deltaPct: number } | null;
+  advice: { worthSwitch: boolean; extraGainUsdYear: number; switchCostUsd: number; paybackDays: number | null } | null;
 }
 export interface AutopilotResult {
-  suggestions: AutopilotSuggestion[];
+  items: AutopilotItem[];
   monitored: number;
   total: number;
 }
@@ -31,6 +39,7 @@ export interface MigrateQuote {
   priceImpact?: number;
   feeBps?: number; // 50 = 0,30% entrada + 0,20% auto-switch
   lpSymbol?: string | null;
+  lpTarget?: string | null; // token da posição nova (pro ledger de aporte)
 }
 
 /** Monta a tx da troca (posição atual → pool melhor) pro usuário ASSINAR. */

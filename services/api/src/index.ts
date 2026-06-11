@@ -290,6 +290,7 @@ app.get('/api/bridge/deposit-quote', async (req, res) => {
       tool: cd.tool ?? null,
       depositUsd: Number(destAmount) / 1e6,
       vaultSymbol: z.lpSymbol,
+      lpTarget: z.lpTarget ?? null,
       engine: z.engine,
       feePct: LIFI_INTEGRATOR ? Number(LIFI_FEE) * 100 : 0,
     });
@@ -349,25 +350,25 @@ app.get('/api/positions', async (req, res) => {
 });
 
 // ── AUTOPILOT (assistido, não-custodial): vigia as posições e sugere trocar pra uma pool melhor ──
-type PoolRow = { pool_key: string; chain: string; project: string; symbol: string | null; exposure: string | null; net_annual_15d: number | null; apy_base: number | null; raw: (EnsoRaw & { managed?: boolean }) | null };
+type PoolRow = { pool_key: string; chain: string; project: string; symbol: string | null; exposure: string | null; net_annual_15d: number | null; apy_base: number | null; return_15d: number | null; il_15d: number | null; risk_score: number | null; vol_low: number | null; vol_high: number | null; raw: (EnsoRaw & { managed?: boolean }) | null };
 const baseSlug = (s: string | null | undefined) => String(s ?? '').toLowerCase().replace(/^.*?:/, '').split(/[-_]/)[0];
 const tokensOf = (s: string | null | undefined) => String(s ?? '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 const shareToken = (a: string | null | undefined, b: string | null | undefined) => { const ta = tokensOf(a); return tokensOf(b).some((x) => ta.includes(x)); };
 const annualOf = (p: PoolRow) => p.net_annual_15d ?? p.apy_base ?? null;
 const typeOf = (p: PoolRow) => (p.exposure === 'single' ? 'emprestimo' : p.raw?.managed ? 'gerenciada' : 'troca');
 
-/** Cérebro do Autopilot: pra cada posição, acha a melhor pool do MESMO tipo/chain com rendimento maior; só sugere se compensa. */
+/** Motor de Saúde da Aplicação: pra CADA posição casada, devolve métricas + melhor alternativa + análise da troca. */
 app.get('/api/autopilot', async (req, res) => {
   try {
     const address = String(req.query.address ?? '');
     if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return res.status(400).json({ error: 'endereço inválido' });
     const [positions, pools] = (await Promise.all([
       loadPositions(address),
-      sql`SELECT pool_key, chain, project, symbol, exposure, net_annual_15d, apy_base, raw FROM pools
+      sql`SELECT pool_key, chain, project, symbol, exposure, net_annual_15d, apy_base, return_15d, il_15d, risk_score, vol_low, vol_high, raw FROM pools
           WHERE lower(project) ~ ${ZAPPABLE_RE} AND (exposure='single' OR raw->>'managed'='true')`,
     ])) as [ApiPosition[], PoolRow[]];
 
-    const suggestions: unknown[] = [];
+    const items: unknown[] = [];
     let monitored = 0;
     for (const pos of positions) {
       const sameChain = pools.filter((p) => p.chain === pos.chain);
@@ -379,26 +380,33 @@ app.get('/api/autopilot', async (req, res) => {
       if (!matched) { monitored++; continue; }
       const annA = annualOf(matched) ?? 0;
       const t = typeOf(matched);
-      const alts = sameChain
+      // melhor alternativa do MESMO tipo/chain com rendimento maior
+      const best = sameChain
         .filter((p) => p.pool_key !== matched.pool_key && typeOf(p) === t && annualOf(p) != null && annualOf(p)! > annA)
-        .sort((a, b) => (annualOf(b) ?? 0) - (annualOf(a) ?? 0));
-      const best = alts[0];
-      if (!best) { monitored++; continue; }
-      const annB = annualOf(best)!;
-      const delta = annB - annA;
-      const switchCostUsd = pos.valueUsd * 0.005 + 0.5; // taxa auto-switch 0,5% + folga de gás
-      const extraGainUsdYear = pos.valueUsd * (delta / 100);
-      if (delta < 1 || extraGainUsdYear <= switchCostUsd) { monitored++; continue; } // não vale o churn / não se paga em 1 ano
-      suggestions.push({
-        from: { token: pos.token, symbol: pos.symbol, protocol: pos.protocol, valueUsd: pos.valueUsd, amount: pos.amount, decimals: pos.decimals, chain: pos.chain, annualPct: annA },
-        to: { poolKey: best.pool_key, symbol: best.symbol, project: best.project, annualPct: annB },
-        deltaPct: delta,
-        extraGainUsdYear,
-        switchCostUsd,
-        paybackDays: Math.ceil(switchCostUsd / (extraGainUsdYear / 365)),
+        .sort((a, b) => (annualOf(b) ?? 0) - (annualOf(a) ?? 0))[0];
+      let bestOut: unknown = null;
+      let advice: unknown = null;
+      if (best) {
+        const annB = annualOf(best)!;
+        const delta = annB - annA;
+        const switchCostUsd = pos.valueUsd * 0.005 + 0.5; // 0,50% auto-switch + folga de gás
+        const extraGainUsdYear = pos.valueUsd * (delta / 100);
+        bestOut = { poolKey: best.pool_key, symbol: best.symbol, project: best.project, annualPct: annB, deltaPct: delta };
+        advice = {
+          worthSwitch: delta >= 1 && extraGainUsdYear > switchCostUsd,
+          extraGainUsdYear,
+          switchCostUsd,
+          paybackDays: extraGainUsdYear > 0 ? Math.ceil(switchCostUsd / (extraGainUsdYear / 365)) : null,
+        };
+      }
+      items.push({
+        from: { token: pos.token, symbol: pos.symbol, protocol: pos.protocol, valueUsd: pos.valueUsd, amount: pos.amount, decimals: pos.decimals, chain: pos.chain, type: t, annualPct: annA },
+        metrics: { return15d: matched.return_15d, il15d: matched.il_15d, riskScore: matched.risk_score, volLow: matched.vol_low, volHigh: matched.vol_high },
+        best: bestOut,
+        advice,
       });
     }
-    res.json({ suggestions, monitored, total: positions.length });
+    res.json({ items, monitored, total: positions.length });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });
@@ -594,12 +602,12 @@ async function buildPortalsCall(pool: { project: string; raw: EnsoRaw }, cfg: Re
 }
 
 // Calldata de DESTINO (a posição a montar) por engine. `captures='enso'|'portals'` já têm nossa taxa; `captures='lifi'` precisa do embrulho LiFi.
-type DestCall = { to: string; data: string; value: string; spender: string; engine: string; captures: 'enso' | 'lifi' | 'portals'; lpSymbol: string | null; amountOut?: string; gas?: string; priceImpact?: number; feeBps?: number };
+type DestCall = { to: string; data: string; value: string; spender: string; engine: string; captures: 'enso' | 'lifi' | 'portals'; lpSymbol: string | null; lpTarget?: string; amountOut?: string; gas?: string; priceImpact?: number; feeBps?: number };
 async function resolveDestCall(pool: { project: string; raw: EnsoRaw }, cfg: ReturnType<typeof chainOf>, amountBase: string, receiver: string): Promise<DestCall | { error: string }> {
   // Pendle: tem market casado → engine Pendle (embrulho LiFi capta a taxa).
   if (pool.raw?.pendle?.market && pool.raw.pendle.pt) {
     const p = await buildPendleCall(cfg, pool.raw.pendle, amountBase, receiver);
-    if (!('error' in p)) return { to: p.to, data: p.data, value: '0', spender: p.spender, engine: 'pendle', captures: 'lifi', lpSymbol: p.lpSymbol };
+    if (!('error' in p)) return { to: p.to, data: p.data, value: '0', spender: p.spender, engine: 'pendle', captures: 'lifi', lpSymbol: p.lpSymbol, lpTarget: pool.raw.pendle.pt };
     // se Pendle falhar, cai pro Enso (raro)
   }
   const z = await buildEnsoZap(pool, cfg, amountBase, receiver);

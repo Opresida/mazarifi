@@ -6,6 +6,7 @@ import { useWallet, switchToChain, sendTx } from '../lib/wallet';
 import { quoteWithdraw, tokenAllowance, approveToken, type WithdrawQuote } from '../lib/zap';
 import { chainCfg } from '../lib/chains';
 import { friendlyError } from '../lib/txError';
+import { clearPosition } from '../lib/ledger';
 import { Card } from './atoms';
 import { fmtUsd } from '../lib/format';
 import { WalletButton } from './WalletButton';
@@ -115,6 +116,7 @@ function WithdrawCard({ position, address, net, onDone }: { position: Position; 
       setSt('withdrawing');
       const hash = await sendTx({ to: quote.to, data: quote.data, value: quote.value });
       setTxHash(hash);
+      clearPosition(position.token, pchain); // saiu da posição → tira do ledger de aporte
       setSt('done');
       setTimeout(onDone, 4000);
     } catch (e) {
