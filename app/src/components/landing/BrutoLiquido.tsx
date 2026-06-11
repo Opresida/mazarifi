@@ -68,8 +68,8 @@ export function BrutoLiquido() {
           {display.toFixed(1)}%
         </motion.div>
         <p className="font-mono mt-2 text-xs uppercase tracking-[0.18em] text-muted-2">
-          {phase === 0 ? 'rendimento anunciado' : isNet ? (
-            <span className="inline-flex items-center gap-1 text-lime"><Check size={13} /> isso é seu</span>
+          {phase === 0 ? 'APY anunciado (ao ano)' : isNet ? (
+            <span className="inline-flex items-center gap-1 text-lime"><Check size={13} /> APY real, já líquido</span>
           ) : 'descontando o que ninguém mostra…'}
         </p>
       </div>
@@ -92,7 +92,28 @@ export function BrutoLiquido() {
         </AnimatePresence>
       </div>
 
-      <p className="font-mono mt-auto pt-6 text-center text-[10px] text-muted-2">Exemplo ilustrativo · cada cofre mostra o número real, medido por nós.</p>
+      {/* payoff: a nossa cara — realizado 15d + valor que é seu */}
+      <AnimatePresence>
+        {isNet && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+            className="mt-5 rounded-2xl border border-lime/25 bg-lime/[0.06] px-4 py-3.5 text-center"
+          >
+            <p className="text-[13px] leading-relaxed text-muted">
+              E a gente não mostra projeção — mostra o que <b className="text-lime">rendeu de verdade</b>:
+            </p>
+            <p className="font-mono tnum mt-1.5 text-[15px] font-bold text-ftext">
+              +0,63% <span className="font-sans text-xs font-normal text-muted">nos últimos 15 dias</span>
+            </p>
+            <p className="font-mono tnum text-[13px] text-lime">R$6 de cada R$1.000 · é seu</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <p className="font-mono mt-auto pt-5 text-center text-[10px] text-muted-2">Exemplo ilustrativo · cada cofre mostra o número real, medido por nós.</p>
     </motion.div>
   );
 }
