@@ -4,14 +4,22 @@
 @theme {
   --color-ink: #0a0b14;
   --color-ink-2: #0d0f1a;
+  --color-void: #06080f; /* profundidade máxima (hero/footer) */
+  --color-petrol: #0a2622; /* teal-petróleo (híbrido: toque de profundidade) */
+  --color-petrol-2: #06120f;
   --color-card: #11131d;
   --color-card-2: #161a28;
   --color-edge: #1f2433;
   --color-edge-soft: #191d2b;
-  /* primária verde */
+  /* primária verde (a marca) — "você ganha" */
   --color-lime: #34e29b;
   --color-lime-bright: #5cf0b3;
   --color-lime-dim: #1e7a59;
+  /* sinal âmbar — "a Mazari age / te avisa" */
+  --color-amber: #f5b544;
+  --color-amber-bright: #ffce6a;
+  /* osso (seção de taxas INVERTIDA — nada escondido) */
+  --color-bone: #f4f1ea;
   /* secundárias */
   --color-iris: #7c6ff0;
   --color-iris-bright: #9d90ff;
@@ -31,6 +39,7 @@
   --color-teal: #34e29b;
   --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', 'Geist Mono', monospace;
 }
 
 html {
@@ -55,6 +64,79 @@ body {
 }
 .glow-lime {
   box-shadow: 0 0 24px rgba(52, 226, 155, 0.22);
+}
+.glow-amber {
+  box-shadow: 0 0 24px rgba(245, 181, 68, 0.22);
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ── Landing futurista ── */
+/* Mesh/grid HUD sutil de fundo (blueprint) */
+.mesh-grid {
+  background-image:
+    linear-gradient(rgba(52, 226, 155, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 226, 155, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(closest-side, #000, transparent);
+  mask-image: radial-gradient(closest-side, #000, transparent);
+}
+/* fundo híbrido do hero: ink + profundidade petróleo + glow lime/âmbar */
+.hero-bg {
+  background:
+    radial-gradient(1100px 620px at 78% -10%, rgba(52, 226, 155, 0.13), transparent 60%),
+    radial-gradient(720px 460px at 12% 8%, rgba(10, 38, 34, 0.7), transparent 60%),
+    radial-gradient(500px 320px at 96% 60%, rgba(245, 181, 68, 0.06), transparent 55%),
+    var(--color-void);
+}
+/* CTA primário com preenchimento líquido (sobe de baixo) */
+.cta-liquid {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.cta-liquid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--color-lime-bright);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: -1;
+}
+.cta-liquid:hover::before {
+  transform: scaleY(1);
+}
+/* link de nav: sublinhado cresce do centro */
+.nav-underline {
+  position: relative;
+}
+.nav-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 0;
+  height: 1.5px;
+  background: var(--color-lime-bright);
+  transform: translateX(-50%);
+  transition: width 0.3s ease;
+}
+.nav-underline:hover::after {
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 ::selection {
   background: rgba(52, 226, 155, 0.3);
