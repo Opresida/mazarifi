@@ -10,6 +10,7 @@ import type { BestPicks } from '../types';
 import { Constellation } from '../components/landing/Constellation';
 import { Marquee } from '../components/landing/Marquee';
 import { BrutoLiquido } from '../components/landing/BrutoLiquido';
+import { Funnel } from '../components/landing/Funnel';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -133,13 +134,14 @@ export function Landing() {
         <div className="mesh-grid pointer-events-none absolute inset-0" />
         <div className="relative mx-auto max-w-6xl px-5 py-20">
           <Reveal>
-            <p className="font-mono text-center text-xs uppercase tracking-[0.2em] text-lime">honestidade não é promessa</p>
+            <p className="font-mono text-center text-xs uppercase tracking-[0.2em] text-lime">transparência de verdade</p>
             <h2 className="font-display mx-auto mt-3 max-w-2xl text-center text-3xl font-bold leading-tight text-ftext sm:text-4xl">
-              É cálculo. E você vê acontecer.
+              Nada de caixa-preta. Você vê tudo acontecer.
             </h2>
           </Reveal>
-          <div className="mt-10">
+          <div className="mt-10 grid items-stretch gap-5 lg:grid-cols-2">
             <BrutoLiquido />
+            <Funnel />
           </div>
         </div>
       </section>

@@ -2,38 +2,39 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check } from 'lucide-react';
 
-/** Animação viva: "do bruto ao líquido" — descasca o número anunciado até o que é SEU. Exemplo ilustrativo. */
-const GROSS = 22.0;
+/** Animação viva "do bruto ao líquido" — descasca o número anunciado pelos descontos REAIS até o que é SEU. */
+const GROSS = 28.0;
 const CUTS = [
-  { label: 'Perda no preço (IL)', delta: 9.0, color: 'text-rose' },
-  { label: 'Taxas (entrada + gás)', delta: 0.5, color: 'text-amber' },
+  { label: 'Perda no preço (IL)', delta: 10.0, color: 'text-rose' },
+  { label: 'Taxa do gestor do cofre', delta: 1.7, color: 'text-rose' },
+  { label: 'Slippage (montar a posição)', delta: 0.5, color: 'text-amber' },
+  { label: 'Taxa Mazari (0,30%)', delta: 0.3, color: 'text-amber' },
+  { label: 'Gás de rede', delta: 0.2, color: 'text-amber' },
 ];
-const NET = GROSS - CUTS.reduce((a, c) => a + c.delta, 0); // 12.5
-const VALUES = [GROSS, GROSS - CUTS[0].delta, NET, NET]; // alvo do número por fase
+const N = CUTS.length;
+const valueAt = (phase: number) => GROSS - CUTS.slice(0, phase).reduce((a, c) => a + c.delta, 0);
+const NET = valueAt(N);
 
 export function BrutoLiquido() {
-  const [phase, setPhase] = useState(0);
+  const [phase, setPhase] = useState(0); // 0=bruto, 1..N descontando, N=líquido
   const [display, setDisplay] = useState(GROSS);
   const raf = useRef(0);
 
-  // ciclo de fases (0 anunciado → 1 −IL → 2 −taxas → 3 líquido) e volta
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setPhase(3); setDisplay(NET); return; }
-    const delays = [1400, 1300, 1300, 2800];
-    const t = setTimeout(() => setPhase((p) => (p + 1) % 4), delays[phase]);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setPhase(N); setDisplay(NET); return; }
+    const delay = phase === 0 ? 1200 : phase === N ? 3200 : 820;
+    const t = setTimeout(() => setPhase((p) => (p + 1) % (N + 1)), delay);
     return () => clearTimeout(t);
   }, [phase]);
 
-  // tween do número ao mudar de fase
   useEffect(() => {
-    const target = VALUES[phase];
+    const target = valueAt(phase);
     let start: number | null = null;
     const from = display;
     const tick = (t: number) => {
       if (start == null) start = t;
-      const p = Math.min(1, (t - start) / 700);
-      const e = 1 - Math.pow(1 - p, 3);
-      setDisplay(from + (target - from) * e);
+      const p = Math.min(1, (t - start) / 650);
+      setDisplay(from + (target - from) * (1 - Math.pow(1 - p, 3)));
       if (p < 1) raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
@@ -41,7 +42,7 @@ export function BrutoLiquido() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  const isNet = phase >= 3;
+  const isNet = phase >= N;
 
   return (
     <motion.div
@@ -49,19 +50,16 @@ export function BrutoLiquido() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-80px' }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="relative isolate mx-auto flex max-w-md flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-7 backdrop-blur-md"
+      className="relative isolate mx-auto flex h-full max-w-md flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-7 backdrop-blur-md"
     >
-      {/* glow de fundo */}
       <div className="pointer-events-none absolute -inset-px -z-10 rounded-3xl" style={{ background: 'radial-gradient(420px 220px at 50% -10%, rgba(52,226,155,.12), transparent 70%)' }} />
       <h3 className="font-display text-center text-2xl font-bold text-ftext">Do bruto ao líquido</h3>
       <p className="font-mono mx-auto mt-2 max-w-sm text-center text-[13px] leading-relaxed text-muted">
-        Quase todo mundo te mostra o número de cima. A gente mostra o que <b className="text-ftext">sobra pra você</b> — descontando perda, taxa e gás, na sua frente.
+        Quase todo mundo te mostra o número de cima. A gente mostra o que <b className="text-ftext">sobra pra você</b> — descontando tudo, na sua frente.
       </p>
 
-      {/* número grande */}
-      <div className="mt-7 text-center">
+      <div className="mt-6 text-center">
         <motion.div
-          key={isNet ? 'net' : 'gross'}
           animate={isNet ? { scale: [1, 1.06, 1] } : { scale: 1 }}
           transition={{ duration: 0.6 }}
           className={`font-display font-mono tnum text-6xl font-bold transition-colors ${isNet ? 'text-lime' : 'text-ftext'}`}
@@ -76,30 +74,25 @@ export function BrutoLiquido() {
         </p>
       </div>
 
-      {/* deduções aparecendo */}
-      <div className="mt-6 space-y-2">
+      <div className="mt-6 space-y-1.5">
         <AnimatePresence>
-          {phase >= 1 && phase < 3 && <CutRow {...CUTS[0]} />}
-          {phase >= 2 && phase < 3 && <CutRow {...CUTS[1]} />}
+          {CUTS.slice(0, phase).map((c) => (
+            <motion.div
+              key={c.label}
+              initial={{ opacity: 0, x: -16, height: 0 }}
+              animate={{ opacity: 1, x: 0, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center justify-between rounded-xl border border-edge bg-ink/50 px-3.5 py-2"
+            >
+              <span className="text-[13px] text-muted">− {c.label}</span>
+              <span className={`font-mono tnum text-[13px] font-semibold ${c.color}`}>−{c.delta.toFixed(1)}%</span>
+            </motion.div>
+          ))}
         </AnimatePresence>
       </div>
 
-      <p className="font-mono mt-6 text-center text-[10px] text-muted-2">Exemplo ilustrativo · cada cofre mostra o número real, medido por nós.</p>
-    </motion.div>
-  );
-}
-
-function CutRow({ label, delta, color }: { label: string; delta: number; color: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -16, height: 0 }}
-      animate={{ opacity: 1, x: 0, height: 'auto' }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="flex items-center justify-between rounded-xl border border-edge bg-ink/50 px-3.5 py-2.5"
-    >
-      <span className="text-sm text-muted">− {label}</span>
-      <span className={`font-mono tnum text-sm font-semibold ${color}`}>−{delta.toFixed(1)}%</span>
+      <p className="font-mono mt-auto pt-6 text-center text-[10px] text-muted-2">Exemplo ilustrativo · cada cofre mostra o número real, medido por nós.</p>
     </motion.div>
   );
 }
