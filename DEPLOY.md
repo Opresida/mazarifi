@@ -15,9 +15,16 @@ App **Vite puro** (React 19 + Tailwind 4 + wouter). Standalone — não importa 
 - **Framework Preset:** Vite (autodetecta)
 - **Build Command:** `vite build` · **Output:** `dist` · **Install:** `pnpm install`
 
-**Antes do deploy:** em [`app/vercel.json`](app/vercel.json), troque `https://COLOQUE-A-URL-DA-API` pela URL pública da API (passo 2). Os rewrites:
-- `/api/*` → a API (o front chama `/api/...` relativo; a Vercel faz o proxy).
-- `/*` → `index.html` (rotas do wouter: `/dashboard`, `/pool/:key`, `/minhas-aplicacoes`, `/admin`).
+O [`app/vercel.json`](app/vercel.json) já faz o **SPA fallback** (rotas do wouter `/dashboard`, `/pool/:key`, `/minhas-aplicacoes`, `/admin` → `index.html`), excluindo `/api`. Isso faz a landing + todas as rotas abrirem. ⚠️ **Não coloque URL inválida nos rewrites — a Vercel rejeita e quebra o SPA.**
+
+**Quando a API estiver no ar (passo 2),** adicione o proxy do `/api` ANTES do fallback (o front chama `/api/...` relativo):
+```json
+"rewrites": [
+  { "source": "/api/:path*", "destination": "https://SUA-API.com/api/:path*" },
+  { "source": "/((?!api/).*)", "destination": "/index.html" }
+]
+```
+Aí faça commit/push → a Vercel re-deploya e o app puxa os dados.
 
 > Arquivos estáticos (`/favicon-*.png`, `/logos/*`, `/logo.png`) são servidos direto pela Vercel antes dos rewrites.
 
