@@ -9,6 +9,7 @@ import { fetchBest } from '../api';
 import type { BestPicks } from '../types';
 import { Constellation } from '../components/landing/Constellation';
 import { Marquee } from '../components/landing/Marquee';
+import { BrutoLiquido } from '../components/landing/BrutoLiquido';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -39,7 +40,7 @@ export function Landing() {
       {/* S0 — Navbar sticky-shrink */}
       <header className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? 'border-b border-lime/15 bg-ink/80 backdrop-blur-xl' : 'border-b border-transparent'}`}>
         <div className={`mx-auto flex max-w-6xl items-center justify-between px-5 transition-all duration-300 ${scrolled ? 'py-3' : 'py-5'}`}>
-          <Logo />
+          <Logo className="h-8 w-auto" />
           <nav className="hidden items-center gap-6 text-sm text-muted md:flex">
             <a href="#resolve" className="nav-underline hover:text-ftext">Como funciona</a>
             <a href="#cofres" className="nav-underline hover:text-ftext">Cofres</a>
@@ -124,6 +125,22 @@ export function Landing() {
           <Beat n="01" title="A gente acha seu dinheiro" desc="Varremos 7 redes e achamos seus ativos conhecidos, onde quer que estejam." />
           <Beat n="02" title="Traz pra rede certa" desc="A melhor rota cross-chain, automática — você não escolhe nada." />
           <Beat n="03" title="Investe no melhor cofre" desc="Monta a posição e te entrega pronta. Você só acompanha o rendimento." />
+        </div>
+      </section>
+
+      {/* S2.5 — Honestidade em movimento (card de vidro vivo) */}
+      <section className="relative overflow-hidden border-t border-edge bg-void">
+        <div className="mesh-grid pointer-events-none absolute inset-0" />
+        <div className="relative mx-auto max-w-6xl px-5 py-20">
+          <Reveal>
+            <p className="font-mono text-center text-xs uppercase tracking-[0.2em] text-lime">honestidade não é promessa</p>
+            <h2 className="font-display mx-auto mt-3 max-w-2xl text-center text-3xl font-bold leading-tight text-ftext sm:text-4xl">
+              É cálculo. E você vê acontecer.
+            </h2>
+          </Reveal>
+          <div className="mt-10">
+            <BrutoLiquido />
+          </div>
         </div>
       </section>
 
