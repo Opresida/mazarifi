@@ -14,7 +14,12 @@ Repo: **`Opresida/mazarifi`** · Redes: **Base + Arbitrum** (mainnet) · Stack: 
 - **Incentivo não assusta, informa:** checamos a **solidez do token de recompensa** (ex.: AERO = sólido) e mostramos o **piso sem incentivo**.
 - **Score de risco CEGO À ORIGEM:** pool Nortoken não ganha bônus; `source` é só metadata.
 - **Não-custodial:** seu dinheiro nunca passa pela Mazari. Depósito e saque são **1 transação que VOCÊ assina** (via aggregator Enso).
-- **Multi-chain + cross-chain:** pools em **Base e Arbitrum**. Se seu USDC está numa rede e a pool em outra, a gente **detecta sozinho** e traz pra você — com a opção de **depositar em 1 assinatura** (ponte LiFi + entra no vault no destino).
+- **Multi-chain + cross-chain:** pools em **Base e Arbitrum**. Se seu USDC está numa rede e a pool em outra, a gente **detecta sozinho** e traz pra você — com a opção de **depositar em 1 assinatura** (ponte LiFi + entra no vault no destino). E mais: traz de **qualquer rede/ativo conhecido** ("a Mazari resolve").
+- **Autopilot (Pro):** vigia suas aplicações 24/7 e, quando aparece uma pool melhor, **te avisa e troca em 1 clique** — só quando compensa de verdade. Não-custodial.
+- **Saúde da Aplicação:** por posição, mostra performance (dia/quinzena/mês), IL e um indicador de saúde; se entra no vermelho, monta a análise **ficar-vs-trocar** e você decide.
+- **Cobertura via várias engines** (Enso + Pendle renda-fixa + Portals) — todas captam a taxa pro tesouro. Receita: ver [`docs/RECEITA.md`](docs/RECEITA.md).
+
+> **Deploy:** ver [`DEPLOY.md`](DEPLOY.md) — frontend na Vercel (`app/vercel.json`), API num servidor (Render/Railway/Fly), cron no GitHub Actions.
 
 ---
 

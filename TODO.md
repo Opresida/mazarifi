@@ -26,6 +26,16 @@
 - [x] **Rebate LiFi LIGADO** — `LIFI_INTEGRATOR=Mazari-Fi` (sem API key, só a string) → 0,3% pro tesouro na ponte.
 - [x] **Depósito cross-chain em 1 ASSINATURA** — `/api/bridge/deposit-quote` (LiFi contractCalls + zap Enso no destino); 1 tx faz ponte + entra no vault. `buildEnsoZap` reutilizável. Testado (quote): Base→vault wstETH/WETH Arb supported.
 
+**Cobertura + "A Mazari resolve" + Autopilot + Saúde (2026-06-11)**
+- [x] **"A Mazari resolve"** — origem desacoplada do destino: traz fundos de QUALQUER rede/ativo conhecido (`/api/funding-sources`, `SOURCE_CHAINS`/`SOURCE_TOKENS`) → 1 clique investe no vault.
+- [x] **Engines de zap plugáveis** — Enso + **Pendle** (renda fixa, Hosted SDK v2) + **Portals** (2ª engine); `resolveDestCall`. **Todas captam a taxa → tesouro**. Gaps nicho → "em breve".
+- [x] **UX de erro confortável** (`lib/txError`) + "em breve" nos não-cobertos.
+- [x] **Monetização v2 + tesouro ATIVO** — taxa 0,30% entrada (saída 0%); `docs/RECEITA.md` (6 camadas com status).
+- [x] **LANDING redesign futurista** — Constelação cross-chain + carrossel redes/protocolos + cards vivos (bruto→líquido, funil, ecossistema, demo de troca do Autopilot) + logos oficiais + favicon; tom mais leve.
+- [x] **Autopilot assistido (não-custodial, Pro)** — `/api/autopilot` + `/migrate`; vigia e troca em 1 clique; **swap 0,2% no auto-switch ATIVO** (0,50% total). Só sugere quando compensa.
+- [x] **Saúde da Aplicação (Fase 1 in-app)** — `core/health` + ledger de aporte + `HealthPanel` (saúde, IL, PnL desde o aporte, proposta ficar-vs-trocar com Aprovar/Não-agora, re-propõe em 3 dias). Empréstimo nunca fica vermelho.
+- [x] **Deploy preparado** — `app/vercel.json` + `DEPLOY.md` (frontend Vercel + API servidor + cron Actions).
+
 ## 🔨 AMANHÃ (prioridade) — 2026-06-11
 
 - [ ] **TESTE COM VALOR REAL** ($2-5): depósito cross-chain 1 clique (USDC Base → vault Arb roteável) — confirmar que o destino **não reverte** on-chain (o quote só prova a estrutura). Se reverter → validar o fallback (USDC fica na rede destino → depósito normal).
@@ -39,14 +49,16 @@
 
 - [ ] **Casamento EXATO da pool no zap** — hoje casa por par (pode pegar pool de baixa liquidez / CL). Mostra o impacto, mas precisa mirar a pool certa.
 - [ ] **Gestão de range (CL)** — resolvida via **vaults gerenciados Beefy-CLM** (o vault cuida do range). Pools cruas de CL: só sinalizamos "assume in-range".
-- [ ] **Landing redesign** — desatualizada ("100% automático: em breve" mas o zap já existe) e pobre de prova/visual. Tarefa com design-chief + copy-chief.
+- [x] **Landing redesign** — FEITO (Constelação cross-chain + cards vivos + ecossistema + demo do Autopilot + logos/favicon oficiais).
 - [ ] **Cross-chain numa assinatura: hoje a estimativa de saída da LiFi vem ~0** — mostramos o valor pelo USDC que chega (ok), mas vale revisitar se a LiFi melhorar.
 
 ## ⏳ Roadmap
 
 - [ ] **Fase 1.5 — Imposto BR** (`core/tax-br`: GCAP, isenção R$35k/mês, Grupo 08) — relatório auxiliar + disclaimer
 - [ ] **Fase 2 — Keeper** (rebalance do range, não saca; EOA→Safe+módulo) — depende de pools Nortoken reais
-- [ ] **Autopilot/Pro** — auto-switch entre vaults (hook 0,2%, só Pro) + cobrança/gating da assinatura (rail 35% do lucro, âncora 5%)
+- [x] **Autopilot assistido + swap 0,2%** — FEITO (não-custodial, 1 clique). **Falta:** cobrança/gating real do Pro (rail 35%, âncora 5%) + **Autopilot autônomo** (move sozinho — precisa keeper+auditoria, Rota A).
+- [ ] **Saúde da Aplicação — Fase 2** — re-envio automático em 3 dias por **email/push** + **histórico diário cross-device** (snapshots) — precisa user DB + notificações (vão junto com o billing do Pro).
+- [ ] **Slippage 50/50** — precisa router próprio (Rota A) — agregadores não dão split de slippage positivo (ver `docs/RECEITA.md` #5).
 - [ ] **Fase 3 — Performance fee** 8-10% sobre o rendimento (receita) + zap de outros tokens (não só USDC) + claim de reward
 - [ ] **Optimism/Polygon** — destravadas pela **databarn da Beefy** (free, cobre os vaults que o DefiLlama não rastreia)
 - [ ] **Memes/Correlacionadas** nos filtros (quando houver dado confiável)
