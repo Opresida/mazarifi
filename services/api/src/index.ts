@@ -455,8 +455,58 @@ async function buildPendleCall(cfg: ReturnType<typeof chainOf>, pendle: PendleRa
   }
 }
 
-// Calldata de DESTINO (a posição a montar) por engine. `captures='enso'` já tem nossa taxa; `captures='lifi'` precisa do embrulho LiFi.
-type DestCall = { to: string; data: string; value: string; spender: string; engine: string; captures: 'enso' | 'lifi'; lpSymbol: string | null; amountOut?: string; gas?: string; priceImpact?: number; feeBps?: number };
+// ── Engine PORTALS: zapper de DeFi (cobre o que o Enso não cobre: spark/sky/morpho/compound-v3/fluid). Capta NOSSA taxa NATIVA (partner fee). ──
+const PORTALS = 'https://api.portals.fi/v2';
+const portalsHeaders = () => ({ Authorization: `Bearer ${process.env.PORTALS_API_KEY}` });
+const portalsCache = new Map<string, Array<{ key: string; underlying: string[] }>>();
+
+function portalsPlatform(project: string): string | null {
+  const p = project.toLowerCase();
+  if (p.includes('fluid')) return 'fluid';
+  if (p.includes('morpho') || p.includes('gauntlet')) return 'morpho';
+  if (p.includes('compound')) return 'compound-v3';
+  if (p.includes('spark') || p.includes('sky')) return 'sky-money-savings';
+  return null;
+}
+
+/** Posições de um protocolo numa rede (cache) — `key`=`network:address` + os underlying (lowercase). */
+async function portalsPositions(network: string, platform: string): Promise<Array<{ key: string; underlying: string[] }>> {
+  const ck = `${network}:${platform}`;
+  const cached = portalsCache.get(ck);
+  if (cached) return cached;
+  const r = await fetchRetry(`${PORTALS}/tokens?networks=${network}&platforms=${platform}&limit=250`, { headers: portalsHeaders() });
+  let out: Array<{ key: string; underlying: string[] }> = [];
+  if (r.ok) {
+    const j = (await r.json()) as { tokens?: Array<{ key: string; tokens?: string[] }> };
+    out = (j.tokens ?? []).map((t) => ({ key: t.key, underlying: (t.tokens ?? []).map((x) => String(x).toLowerCase()) }));
+  }
+  portalsCache.set(ck, out);
+  return out;
+}
+
+async function buildPortalsCall(pool: { project: string; raw: EnsoRaw }, cfg: ReturnType<typeof chainOf>, amountBase: string, receiver: string): Promise<{ to: string; data: string; value: string; spender: string; lpSymbol: string } | { error: string }> {
+  if (!process.env.PORTALS_API_KEY) return { error: 'portals sem key' };
+  const platform = portalsPlatform(pool.project);
+  if (!platform) return { error: 'protocolo sem portals' };
+  const network = cfg.name.toLowerCase();
+  const underlying = (pool.raw?.underlyingTokens ?? []).map((x) => String(x).toLowerCase());
+  if (underlying.length === 0) return { error: 'sem underlying' };
+  const positions = await portalsPositions(network, platform);
+  // match SEGURO: a posição que contém TODOS os nossos underlying E é ÚNICA. Ambíguo (ex.: vários vaults USDC) → NÃO arrisca depositar no errado.
+  const candidates = positions.filter((p) => underlying.every((u) => p.underlying.includes(u)));
+  if (candidates.length !== 1) return { error: candidates.length === 0 ? 'posição não encontrada no Portals' : 'Portals ambíguo (vários vaults)' };
+  const best = candidates[0];
+  const q = new URLSearchParams({ sender: receiver, inputToken: `${network}:${cfg.usdc.toLowerCase()}`, inputAmount: amountBase, outputToken: best.key, slippageTolerancePercentage: '1', validate: 'false' });
+  if (MAZARI_TREASURY) { q.set('partner', MAZARI_TREASURY); q.set('feePercentage', String(Number(ZAP_FEE_BPS) / 100)); } // capta NOSSA taxa nativa
+  const r = await fetchRetry(`${PORTALS}/portal?${q.toString()}`, { headers: portalsHeaders() });
+  if (!r.ok) return { error: `Portals ${r.status}` };
+  const d = (await r.json()) as { tx?: { to?: string; data?: string; value?: string } };
+  if (!d.tx?.to || !d.tx.data) return { error: 'Portals sem tx' };
+  return { to: d.tx.to, data: d.tx.data, value: d.tx.value ?? '0', spender: d.tx.to, lpSymbol: `posição ${platform}` };
+}
+
+// Calldata de DESTINO (a posição a montar) por engine. `captures='enso'|'portals'` já têm nossa taxa; `captures='lifi'` precisa do embrulho LiFi.
+type DestCall = { to: string; data: string; value: string; spender: string; engine: string; captures: 'enso' | 'lifi' | 'portals'; lpSymbol: string | null; amountOut?: string; gas?: string; priceImpact?: number; feeBps?: number };
 async function resolveDestCall(pool: { project: string; raw: EnsoRaw }, cfg: ReturnType<typeof chainOf>, amountBase: string, receiver: string): Promise<DestCall | { error: string }> {
   // Pendle: tem market casado → engine Pendle (embrulho LiFi capta a taxa).
   if (pool.raw?.pendle?.market && pool.raw.pendle.pt) {
@@ -465,8 +515,11 @@ async function resolveDestCall(pool: { project: string; raw: EnsoRaw }, cfg: Ret
     // se Pendle falhar, cai pro Enso (raro)
   }
   const z = await buildEnsoZap(pool, cfg, amountBase, receiver);
-  if ('error' in z) return z;
-  return { ...z, engine: 'enso', captures: 'enso', amountOut: z.amountOut, lpSymbol: z.lpSymbol };
+  if (!('error' in z)) return { ...z, engine: 'enso', captures: 'enso', amountOut: z.amountOut, lpSymbol: z.lpSymbol };
+  // Enso falhou → tenta PORTALS (cobre spark/sky/morpho/compound/fluid; capta nossa taxa nativa)
+  const p = await buildPortalsCall(pool, cfg, amountBase, receiver);
+  if (!('error' in p)) return { to: p.to, data: p.data, value: p.value, spender: p.spender, engine: 'portals', captures: 'portals', lpSymbol: p.lpSymbol };
+  return z; // reporta o erro do Enso
 }
 
 /** LiFi `/quote` ativo→USDC (mesma rede ou cross) só pra saber o USDC ENTREGUE (a saída do contractCall não é confiável). */
@@ -513,8 +566,11 @@ app.get('/api/zap/quote', async (req, res) => {
     // Engine ENSO (capta a taxa nativa) → tx direta, mais barata.
     if (!pr.raw?.pendle?.market) {
       const z = await buildEnsoZap(pr, cfg, amountIn, fromAddress, slippageBps);
-      if ('error' in z) return res.json({ supported: false, reason: z.error });
-      return res.json({ supported: true, engine: 'enso', lpTarget: z.lpTarget, lpSymbol: z.lpSymbol, tokenIn: cfg.usdc, amountIn, to: z.to, data: z.data, value: z.value, spender: z.spender, amountOut: z.amountOut, gas: z.gas, priceImpact: z.priceImpact ?? 0, feeBps: z.feeBps });
+      if (!('error' in z)) return res.json({ supported: true, engine: 'enso', lpTarget: z.lpTarget, lpSymbol: z.lpSymbol, tokenIn: cfg.usdc, amountIn, to: z.to, data: z.data, value: z.value, spender: z.spender, amountOut: z.amountOut, gas: z.gas, priceImpact: z.priceImpact ?? 0, feeBps: z.feeBps });
+      // Enso falhou → PORTALS (cobre spark/sky/morpho/compound/fluid; capta nossa taxa nativa; tx direta)
+      const p = await buildPortalsCall(pr, cfg, amountIn, fromAddress);
+      if (!('error' in p)) return res.json({ supported: true, engine: 'portals', lpSymbol: p.lpSymbol, tokenIn: cfg.usdc, amountIn, to: p.to, data: p.data, value: p.value, spender: p.spender, priceImpact: 0, feeBps: MAZARI_TREASURY ? Number(ZAP_FEE_BPS) : 0 });
+      return res.json({ supported: false, reason: z.error });
     }
 
     // Engine PENDLE → mesma rede, embrulhada na LiFi pra CAPTAR NOSSA TAXA (a tx do Pendle não captaria).
