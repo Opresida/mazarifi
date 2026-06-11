@@ -8,6 +8,7 @@ import { WalletButton } from '../components/WalletButton';
 import { fetchBest } from '../api';
 import type { BestPicks } from '../types';
 import { Constellation } from '../components/landing/Constellation';
+import { Marquee } from '../components/landing/Marquee';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -102,6 +103,12 @@ export function Landing() {
         </div>
       </section>
 
+      {/* S1.5 — Carrossel de redes + protocolos (prova/conexão) */}
+      <section className="border-y border-edge bg-ink/40 py-8">
+        <p className="font-mono mb-6 text-center text-[11px] uppercase tracking-[0.2em] text-muted-2">conecta com as maiores redes e protocolos</p>
+        <Marquee />
+      </section>
+
       {/* S2 — A Mazari resolve */}
       <section id="resolve" className="mx-auto max-w-6xl px-5 py-20">
         <Reveal>
@@ -154,14 +161,7 @@ export function Landing() {
             Aave, Morpho, Compound, Fluid, cofres gerenciados e renda fixa. Se dá pra montar com segurança, a Mazari monta. Se ainda não dá, é <b className="text-amber">"em breve"</b> honesto.
           </p>
         </Reveal>
-        <div className="mt-10 flex flex-wrap gap-3">
-          {['Aave', 'Morpho', 'Compound', 'Fluid', 'Beefy', 'Pendle', 'Spark', 'Moonwell'].map((p, i) => (
-            <Reveal key={p} delay={i * 0.04}>
-              <span className="font-mono rounded-xl border border-edge bg-card/60 px-4 py-2.5 text-sm text-ftext transition-colors hover:border-lime/40 hover:text-lime">{p}</span>
-            </Reveal>
-          ))}
-        </div>
-        <div className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-edge bg-edge sm:grid-cols-3">
+        <div className="mt-10 grid gap-px overflow-hidden rounded-3xl border border-edge bg-edge sm:grid-cols-3">
           <BigStat value={7} label="redes de origem" />
           <BigStat value={8} label="protocolos integrados" plus />
           <BigStat value={2} label="redes de investimento (Base + Arbitrum)" />

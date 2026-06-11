@@ -128,6 +128,39 @@ body {
   width: 100%;
 }
 
+/* Carrossel infinito (redes + protocolos) */
+.marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 2.75rem;
+  animation: marquee-scroll 40s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  filter: grayscale(1);
+  opacity: 0.5;
+  transition: filter 0.3s, opacity 0.3s, transform 0.3s;
+}
+.marquee-item:hover {
+  filter: grayscale(0);
+  opacity: 1;
+  transform: translateY(-3px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

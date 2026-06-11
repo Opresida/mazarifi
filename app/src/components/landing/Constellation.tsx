@@ -135,9 +135,7 @@ export function Constellation() {
       {/* núcleo Mazari (o cofre) */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div className="grid h-16 w-16 place-items-center rounded-2xl border border-lime/40 bg-ink/80 backdrop-blur glow-lime">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M3 19V7l5 6 4-5 4 5 5-6v12" stroke="var(--color-lime)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <img src="/logo-icon.png" alt="Mazari" className="h-10 w-10 object-contain" draggable={false} />
         </div>
       </div>
     </div>
