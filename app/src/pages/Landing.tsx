@@ -248,9 +248,9 @@ export function Landing() {
             <span className="font-mono inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[11px] font-bold uppercase text-lime">
               <Bot size={12} /> Autopilot · Pro
             </span>
-            <h2 className="font-display mt-4 text-2xl font-bold text-ftext sm:text-3xl">A gente acha a pool melhor. Você troca em 1 clique.</h2>
+            <h2 className="font-display mt-4 text-2xl font-bold text-ftext sm:text-3xl">A gente acha a melhor pool. Você troca em 1 clique.</h2>
             <p className="mx-auto mt-3 max-w-xl leading-relaxed text-muted">
-              O <b className="text-lime">Autopilot</b> vigia suas aplicações 24/7 e, quando aparece uma pool que rende mais, te avisa e monta a troca — você só <b className="text-ftext">assina</b>. A Mazari nunca move seu dinheiro sozinha.
+              O <b className="text-lime">Autopilot</b> vigia suas aplicações 24/7 e te avisa quando aparece uma pool que rende mais. Mas só sugere a troca quando <b className="text-ftext">compensa de verdade</b> — o ganho a mais cobre o custo de trocar e você sai ganhando. Nunca uma troca que te faça sair perdendo. Você só <b className="text-ftext">assina</b>; a Mazari nunca move seu dinheiro sozinha.
             </p>
             <p className="font-mono mx-auto mt-4 max-w-md text-[11px] leading-relaxed text-amber">
               ⏳ Em breve: trocar 100% no automático.
