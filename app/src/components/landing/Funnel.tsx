@@ -1,13 +1,14 @@
 import { motion } from 'framer-motion';
-import { Wallet, Landmark, TrendingUp } from 'lucide-react';
+import { Wallet, Landmark, TrendingUp, type LucideIcon } from 'lucide-react';
 
 /** O caminho do dinheiro: Você (USDC) → Mazari acha a rota → monta o cofre → rende. Token viaja no trilho (estilo Lido). */
-const STATIONS = [
+type Station = { x: number; label: string; sub: string; icon?: LucideIcon; img?: boolean; green?: boolean };
+const STATIONS: Station[] = [
   { x: 8, label: 'Você', sub: 'USDC', icon: Wallet },
   { x: 37, label: 'Mazari', sub: 'acha a rota', img: true },
   { x: 64, label: 'Cofre', sub: 'monta a pool', icon: Landmark },
   { x: 92, label: 'Rende', sub: 'pra você', icon: TrendingUp, green: true },
-] as const;
+];
 
 export function Funnel() {
   const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
