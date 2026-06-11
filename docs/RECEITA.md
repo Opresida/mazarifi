@@ -14,7 +14,7 @@
 | 2 | Rebate da ponte (**LiFi**, ~0,3%) | ✅ **Ativo** | Quem traz dinheiro de outra rede |
 | 3 | **Mazari Pro** (assinatura $5–$25/mês) | 🟡 Autopilot + gating preview prontos; falta cobrança | Cliente Pro (opcional) |
 | 4 | **Swap fee 0,2%** no auto-switch | ✅ **Ativo** (no Autopilot, 0,50% total) | Cliente Pro |
-| 5 | **Slippage 50/50** | 🔜 Falta implementar | Embutido na execução |
+| 5 | **Slippage 50/50** | ⏳ Futuro (precisa router próprio — Rota A) | Embutido na execução |
 | 6 | **Performance fee 8–10%** (Rota A) | ⏳ Futuro (auditoria + jurídico) | Sobre o lucro do cliente |
 
 ---
@@ -59,10 +59,11 @@
 - **Condição:** só pra cliente **Pro** (faz parte do Autopilot).
 - **Estado:** **ATIVO** — implementado no **Autopilot assistido** (`/api/autopilot/migrate`): a troca cobra `AUTOPILOT_FEE_BPS=50` = **0,30% entrada + 0,20% auto-switch**, captado na mesma tx (Enso `fee`/`feeReceiver=tesouro`). Não-custodial (o cliente assina a troca).
 
-### 5. Slippage 50/50
-- **O que é:** quando a execução tem slippage favorável, a Mazari fica com **metade** dele; a outra metade volta pro cliente.
-- **Regra de marca:** sempre **declarado na tela** (nunca escondido).
-- **Estado:** **Falta** — implementação na execução + UI declarando.
+### 5. Slippage 50/50 — ⚠️ precisa de router próprio (Rota A)
+- **O que é:** quando a execução sai melhor que o cotado (slippage favorável / "positive slippage"), a Mazari ficaria com **metade** do excedente; a outra metade volta pro cliente.
+- **DESCOBERTA HONESTA (2026-06-11):** **não dá pra fazer com os agregadores que usamos** (Enso/Portals/LiFi). O parâmetro `fee` deles é uma **% fixa sobre a entrada** (= nossos 0,30%/0,20%), **não** um split do excedente. O agregador manda **100% do output pro cliente** — não existe gancho pra desviar metade do slippage positivo pro tesouro.
+- **Conclusão:** capturar slippage positivo **exige um contrato de execução PRÓPRIO** (a **Rota A**, mesma dependência da performance fee #6) — com **auditoria**. **NÃO é construível agora** sem isso (seria fingir).
+- **O que dá pra fazer já (honesto):** deixar o slippage **transparente na tela** (tolerância + "hoje, qualquer slippage positivo é 100% seu"). O 50/50 entra junto com a Rota A.
 
 ---
 
