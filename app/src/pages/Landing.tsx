@@ -11,6 +11,7 @@ import { Constellation } from '../components/landing/Constellation';
 import { Marquee } from '../components/landing/Marquee';
 import { BrutoLiquido } from '../components/landing/BrutoLiquido';
 import { Funnel } from '../components/landing/Funnel';
+import { Ecosystem } from '../components/landing/Ecosystem';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -233,6 +234,9 @@ export function Landing() {
           </Reveal>
         </div>
       </section>
+
+      {/* S6.5 — Universo DeFi da Mazari (Nortoken + Wallet em breve) */}
+      <Ecosystem />
 
       {/* S7 — Autopilot "em breve" */}
       <section className="mx-auto max-w-4xl px-5 py-16">
