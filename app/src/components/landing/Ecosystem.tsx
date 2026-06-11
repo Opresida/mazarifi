@@ -57,9 +57,13 @@ export function Ecosystem() {
             {!reduce && (
               <motion.div
                 className="absolute top-1/2 h-[3px] w-14 -translate-y-1/2 rounded-full"
-                style={{ background: 'linear-gradient(90deg, transparent, var(--color-lime), transparent)', boxShadow: '0 0 8px rgba(52,226,155,.75)' }}
-                animate={{ left: ['-10%', '100%'] }}
-                transition={{ duration: 2.8, repeat: Infinity, repeatDelay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                style={{ maskImage: 'linear-gradient(90deg, transparent, #000, transparent)', WebkitMaskImage: 'linear-gradient(90deg, transparent, #000, transparent)' }}
+                animate={{
+                  left: ['-10%', '50%', '108%'],
+                  backgroundColor: ['#34e29b', '#22d3ee', '#f5b544'],
+                  boxShadow: ['0 0 8px rgba(52,226,155,.75)', '0 0 9px rgba(34,211,238,.8)', '0 0 9px rgba(245,181,68,.8)'],
+                }}
+                transition={{ duration: 3, times: [0, 0.5, 1], repeat: Infinity, repeatDelay: 0.3, ease: 'linear' }}
               />
             )}
           </div>
