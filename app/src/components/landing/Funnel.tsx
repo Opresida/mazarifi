@@ -30,15 +30,15 @@ export function Funnel() {
       <div className="relative mx-auto mt-12 mb-2 h-28 w-full">
         {/* linha do trilho */}
         <div className="absolute left-[8%] right-[8%] top-7 h-px" style={{ background: 'repeating-linear-gradient(90deg, rgba(138,143,163,.45) 0 6px, transparent 6px 12px)' }} />
-        {/* token USDC viajando */}
+        {/* token USDC (logo oficial) viajando */}
         {!reduce && (
           <motion.div
-            className="font-mono absolute top-7 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-lime/50 bg-ink px-2 py-1 text-[10px] font-bold text-lime"
-            style={{ boxShadow: '0 0 14px rgba(52,226,155,.6)' }}
+            className="absolute top-7 z-10 -translate-x-1/2 -translate-y-1/2"
+            style={{ filter: 'drop-shadow(0 0 10px rgba(52,226,155,.7))' }}
             animate={{ left: ['8%', '37%', '64%', '92%', '92%'] }}
             transition={{ duration: 4.4, times: [0, 0.26, 0.54, 0.82, 1], repeat: Infinity, repeatDelay: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
-            USDC
+            <img src="/logos/usdc.png" alt="USDC" className="h-8 w-8 rounded-full" draggable={false} />
           </motion.div>
         )}
         {/* estações */}
