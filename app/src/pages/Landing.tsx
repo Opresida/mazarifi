@@ -140,7 +140,7 @@ export function Landing() {
               Nada de caixa-preta. Você vê tudo acontecer.
             </h2>
           </Reveal>
-          <div className="mt-10 grid items-stretch gap-5 lg:grid-cols-2">
+          <div className="mx-auto mt-10 max-w-3xl space-y-5">
             <BrutoLiquido />
             <Funnel />
           </div>

@@ -50,7 +50,7 @@ export function BrutoLiquido() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-80px' }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="relative isolate mx-auto flex h-full max-w-md flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-7 backdrop-blur-md"
+      className="relative isolate flex w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-7 backdrop-blur-md"
     >
       <div className="pointer-events-none absolute -inset-px -z-10 rounded-3xl" style={{ background: 'radial-gradient(420px 220px at 50% -10%, rgba(52,226,155,.12), transparent 70%)' }} />
       <h3 className="font-display text-center text-2xl font-bold text-ftext">Do bruto ao líquido</h3>
@@ -58,62 +58,62 @@ export function BrutoLiquido() {
         Quase todo mundo te mostra o número de cima. A gente mostra o que <b className="text-ftext">sobra pra você</b> — descontando tudo, na sua frente.
       </p>
 
-      <div className="mt-6 text-center">
-        <motion.div
-          animate={isNet ? { scale: [1, 1.06, 1] } : { scale: 1 }}
-          transition={{ duration: 0.6 }}
-          className={`font-display font-mono tnum text-6xl font-bold transition-colors ${isNet ? 'text-lime' : 'text-ftext'}`}
-          style={isNet ? { textShadow: '0 0 28px rgba(52,226,155,.45)' } : undefined}
-        >
-          {display.toFixed(1)}%
-        </motion.div>
-        <p className="font-mono mt-2 text-xs uppercase tracking-[0.18em] text-muted-2">
-          {phase === 0 ? 'APY anunciado (ao ano)' : isNet ? (
-            <span className="inline-flex items-center gap-1 text-lime"><Check size={13} /> APY real, já líquido</span>
-          ) : 'descontando o que ninguém mostra…'}
-        </p>
-      </div>
-
-      <div className="mt-6 space-y-1.5">
-        <AnimatePresence>
-          {CUTS.slice(0, phase).map((c) => (
-            <motion.div
-              key={c.label}
-              initial={{ opacity: 0, x: -16, height: 0 }}
-              animate={{ opacity: 1, x: 0, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="flex items-center justify-between rounded-xl border border-edge bg-ink/50 px-3.5 py-2"
-            >
-              <span className="text-[13px] text-muted">− {c.label}</span>
-              <span className={`font-mono tnum text-[13px] font-semibold ${c.color}`}>−{c.delta.toFixed(1)}%</span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* payoff: a nossa cara — realizado 15d + valor que é seu */}
-      <AnimatePresence>
-        {isNet && (
+      {/* horizontal: número (esq) + descontos sempre presentes (dir) = SEM reflow */}
+      <div className="mt-6 grid items-center gap-x-8 gap-y-5 sm:grid-cols-2">
+        <div className="text-center">
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-            className="mt-5 rounded-2xl border border-lime/25 bg-lime/[0.06] px-4 py-3.5 text-center"
+            animate={isNet ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+            transition={{ duration: 0.6 }}
+            className={`font-display font-mono tnum text-6xl font-bold transition-colors ${isNet ? 'text-lime' : 'text-ftext'}`}
+            style={isNet ? { textShadow: '0 0 28px rgba(52,226,155,.45)' } : undefined}
           >
-            <p className="text-[13px] leading-relaxed text-muted">
-              E a gente não mostra projeção — mostra o que <b className="text-lime">rendeu de verdade</b>:
-            </p>
-            <p className="font-mono tnum mt-1.5 text-[15px] font-bold text-ftext">
-              +0,63% <span className="font-sans text-xs font-normal text-muted">nos últimos 15 dias</span>
-            </p>
-            <p className="font-mono tnum text-[13px] text-lime">R$6 de cada R$1.000 · é seu</p>
+            {display.toFixed(1)}%
           </motion.div>
-        )}
-      </AnimatePresence>
+          <p className="font-mono mt-2 text-xs uppercase tracking-[0.18em] text-muted-2">
+            {phase === 0 ? 'APY anunciado (ao ano)' : isNet ? (
+              <span className="inline-flex items-center gap-1 text-lime"><Check size={13} /> APY real, já líquido</span>
+            ) : 'descontando o que ninguém mostra…'}
+          </p>
+          <AnimatePresence>
+            {isNet && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="mt-4 rounded-2xl border border-lime/25 bg-lime/[0.06] px-4 py-3 text-center"
+              >
+                <p className="text-[12px] leading-relaxed text-muted">
+                  Não é projeção — é o que <b className="text-lime">rendeu de verdade</b>:
+                </p>
+                <p className="font-mono tnum mt-1 text-sm font-bold text-ftext">
+                  +0,63% <span className="font-sans text-[11px] font-normal text-muted">nos últimos 15 dias</span>
+                </p>
+                <p className="font-mono tnum text-[12px] text-lime">R$6 de cada R$1.000 · é seu</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
-      <p className="font-mono mt-auto pt-5 text-center text-[10px] text-muted-2">Exemplo ilustrativo · cada cofre mostra o número real, medido por nós.</p>
+        <div className="flex flex-col justify-center gap-1.5">
+          {CUTS.map((c, i) => {
+            const on = i < phase;
+            return (
+              <motion.div
+                key={c.label}
+                animate={{ opacity: on ? 1 : 0.15, x: on ? 0 : -6 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className="flex items-center justify-between rounded-xl border border-edge bg-ink/50 px-3.5 py-2"
+              >
+                <span className="text-[13px] text-muted">− {c.label}</span>
+                <span className={`font-mono tnum text-[13px] font-semibold ${c.color}`}>−{c.delta.toFixed(1)}%</span>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className="font-mono mt-6 text-center text-[10px] text-muted-2">Exemplo ilustrativo · cada cofre mostra o número real, medido por nós.</p>
     </motion.div>
   );
 }
