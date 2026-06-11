@@ -14,7 +14,7 @@ import { WalletButton } from '../components/WalletButton';
 import { buildChecklist, type CheckItem } from '../lib/checklist';
 import { beefyChecklist } from '../lib/beefyRisks';
 import { bestAlternative, migrationAdvice } from '../lib/migration';
-import { poolAnnual, poolName, poolEntryCostPct, poolGasUsd, managedInfo } from '../lib/pool';
+import { poolAnnual, poolName, poolEntryCostPct, poolGasUsd, managedInfo, pendleInfo } from '../lib/pool';
 import { fmtUsdExact } from '../lib/format';
 
 const NAV: NavItem[] = [
@@ -59,6 +59,12 @@ export function PoolPage() {
           <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
             <div className="min-w-0 space-y-4">
               <PoolDetailContent pool={pool} net={net} />
+              {pendleInfo(pool) && (
+                <Card className="border-gold/30 bg-gold/5 p-4">
+                  <p className="text-sm font-semibold text-gold">⏳ Rende fixo até {new Date(pendleInfo(pool)!.expiry).toLocaleDateString('pt-BR')}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">Você trava um rendimento <b>fixo</b> até essa data (estilo renda fixa). No vencimento o rendimento para e seu valor fica resgatável 1:1 — <b className="text-ftext">quando o Autopilot estiver pronto, a gente rola pra próxima sozinho pra você</b>, sem você fazer nada.</p>
+                </Card>
+              )}
               <MoneyProjector
                 title="Simule seu ganho aqui"
                 netAprPct={poolAnnual(pool)}

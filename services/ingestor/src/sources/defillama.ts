@@ -1,6 +1,7 @@
 import { ilFullRange } from '@mazarifi/core';
 import { CHAINS, CHAIN_LIST } from '@mazarifi/chain';
 import { fetchRewardIntegrity, isKnownProtocolProject } from './rewardTokens.js';
+import { fetchPendleIndex, matchPendle, type PendleMatch } from './pendle.js';
 import type { NormalizedPool } from '../types.js';
 
 /** Prefixo do coins.llama.fi pela chain da pool ('base', 'arbitrum'). */
@@ -151,8 +152,23 @@ export async function fetchBasePools(limit = 30): Promise<NormalizedPool[]> {
     fetchRewardIntegrity(rewardItems, knownAddrs).catch(() => new Map()),
   ]);
 
+  // Índice Pendle por chain (só pras chains que têm pool Pendle) — pra casar market + vencimento.
+  const pendleChains = [...new Set(base.filter((p) => p.project.toLowerCase().includes('pendle')).map((p) => p.chain))];
+  const pendleIdx = new Map<string, Map<string, PendleMatch>>();
+  await Promise.all(
+    pendleChains.map(async (ch) => {
+      const cid = CHAINS[ch]?.chainId;
+      if (cid) pendleIdx.set(ch, await fetchPendleIndex(cid));
+    }),
+  );
+
   return base.map((p, i) => {
     const project = p.project.toLowerCase();
+    // Pendle: casa com o market real → guarda { market, pt, expiry } pra engine de zap + mostrar o vencimento.
+    if (project.includes('pendle')) {
+      const pm = matchPendle(pendleIdx.get(p.chain) ?? new Map(), p.underlyingTokens);
+      if (pm) (p as { pendle?: PendleMatch }).pendle = pm;
+    }
     const tvlStability = p.sigma != null ? Math.max(0, Math.min(1, 1 - p.sigma)) : 0.6;
     const ilPct15d = ilApplies(p) ? (ilMap.get(p.pool) ?? null) : 0;
     const ch = charts[i];

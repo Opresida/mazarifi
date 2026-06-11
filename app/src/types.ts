@@ -97,6 +97,7 @@ export interface ManagedRaw {
   risks?: Record<string, boolean | number> | null; // flags do Risk Checklist (Beefy)
   assets?: string[];
   underlyingTokens?: string[];
+  pendle?: { market: string; pt: string; expiry: string }; // empréstimo Pendle (rende fixo até o vencimento)
 }
 
 export interface Stats {

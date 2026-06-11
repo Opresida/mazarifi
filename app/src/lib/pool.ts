@@ -7,6 +7,12 @@ export function managedInfo(p: Pool): ManagedRaw | null {
   return r && r.managed ? r : null;
 }
 
+/** Empréstimo Pendle (rende FIXO até o vencimento) — { market, pt, expiry } se casou com um market. */
+export function pendleInfo(p: Pool): { market: string; pt: string; expiry: string } | null {
+  const r = p.raw as ManagedRaw | null | undefined;
+  return r?.pendle ?? null;
+}
+
 /** Rendimento anualizado a usar no ranking/projetor (base 15d; senão o reportado). */
 export function poolAnnual(p: Pool): number | null {
   return p.net_annual_15d ?? p.apy_base;

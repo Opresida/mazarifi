@@ -246,9 +246,9 @@ app.get('/api/bridge/deposit-quote', async (req, res) => {
     const delivered = BigInt(bd.estimate?.toAmount ?? '0');
     if (delivered <= 0n) return res.json({ supported: false, reason: 'ponte sem rota' });
 
-    // 2) calldata do zap Enso no destino, p/ um pouco ABAIXO do entregue (folga → não reverte por falta de saldo).
+    // 2) calldata da posição no destino (engine certa: Enso OU Pendle), p/ um pouco ABAIXO do entregue (folga → não reverte).
     const destAmount = ((delivered * 998n) / 1000n).toString();
-    const z = await buildEnsoZap(pool as { project: string; raw: EnsoRaw }, toCfg, destAmount, fromAddress);
+    const z = await resolveDestCall(pool as { project: string; raw: EnsoRaw }, toCfg, destAmount, fromAddress);
     if ('error' in z) return res.json({ supported: false, reason: z.error });
 
     // 3) LiFi contractCalls: swap+ponte do ativo origem + executa o zap Enso no destino → 1 tx assinável na origem.
@@ -273,6 +273,7 @@ app.get('/api/bridge/deposit-quote', async (req, res) => {
       tool: cd.tool ?? null,
       depositUsd: Number(destAmount) / 1e6,
       vaultSymbol: z.lpSymbol,
+      engine: z.engine,
       feePct: LIFI_INTEGRATOR ? Number(LIFI_FEE) * 100 : 0,
     });
   } catch (e) {
@@ -368,7 +369,8 @@ function ensoSlug(project: string): string | null {
 const ZAPPABLE_RE = 'aerodrome|uniswap|sushiswap|morpho|gauntlet|curve|balancer|aave|spark|moonwell|fluid|compound|pendle|beefy';
 
 type EnsoZap = { to: string; data: string; value: string; spender: string; amountOut?: string; gas?: string; priceImpact?: number; lpTarget: string; lpSymbol: string | null; feeBps: number };
-type EnsoRaw = { vaultAddress?: string; assets?: string[]; underlyingTokens?: string[] } | null;
+type PendleRaw = { market: string; pt: string; expiry: string };
+type EnsoRaw = { vaultAddress?: string; assets?: string[]; underlyingTokens?: string[]; pendle?: PendleRaw } | null;
 
 /** Resolve o LP/vault alvo + monta a rota Enso (USDC da chain → posição) com a taxa Mazari 0,30%.
  *  `amountBase` = USDC em 6 casas (string); `receiver` = quem recebe a posição. Reusado pelo zap e pelo cross-deposit. */
@@ -417,6 +419,61 @@ async function buildEnsoZap(
   return { to: d.tx.to, data: d.tx.data, value: d.tx.value ?? '0', spender: d.tx.to, amountOut: d.amountOut, gas: d.gas, priceImpact: d.priceImpact ?? 0, lpTarget: lp.address, lpSymbol: lp.symbol ?? null, feeBps };
 }
 
+// ── Engine PENDLE: calldata "USDC → PT" via Pendle Hosted SDK v2 (vai pro router Pendle; NÃO capta nossa taxa → tem que ir embrulhado na LiFi). ──
+const PENDLE_SDK = 'https://api-v2.pendle.finance/core/v2/sdk';
+async function buildPendleCall(cfg: ReturnType<typeof chainOf>, pendle: PendleRaw, amountBase: string, receiver: string, slippage = 0.01): Promise<{ to: string; data: string; spender: string; lpSymbol: string } | { error: string }> {
+  try {
+    const q = new URLSearchParams({ receiver, slippage: String(slippage), tokenIn: cfg.usdc, tokenOut: pendle.pt, amountIn: amountBase, enableAggregator: 'true' });
+    const r = await fetch(`${PENDLE_SDK}/${cfg.chainId}/markets/${pendle.market}/swap?${q.toString()}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!r.ok) return { error: `Pendle ${r.status}` };
+    const j = (await r.json()) as { tx?: { to?: string; data?: string }; tokenApprovals?: Array<{ token?: string; spender?: string }> };
+    if (!j.tx?.to || !j.tx.data) return { error: 'Pendle sem tx' };
+    return { to: j.tx.to, data: j.tx.data, spender: j.tx.to, lpSymbol: 'PT (rende fixo)' };
+  } catch {
+    return { error: 'Pendle indisponível' };
+  }
+}
+
+// Calldata de DESTINO (a posição a montar) por engine. `captures='enso'` já tem nossa taxa; `captures='lifi'` precisa do embrulho LiFi.
+type DestCall = { to: string; data: string; value: string; spender: string; engine: string; captures: 'enso' | 'lifi'; lpSymbol: string | null; amountOut?: string; gas?: string; priceImpact?: number; feeBps?: number };
+async function resolveDestCall(pool: { project: string; raw: EnsoRaw }, cfg: ReturnType<typeof chainOf>, amountBase: string, receiver: string): Promise<DestCall | { error: string }> {
+  // Pendle: tem market casado → engine Pendle (embrulho LiFi capta a taxa).
+  if (pool.raw?.pendle?.market && pool.raw.pendle.pt) {
+    const p = await buildPendleCall(cfg, pool.raw.pendle, amountBase, receiver);
+    if (!('error' in p)) return { to: p.to, data: p.data, value: '0', spender: p.spender, engine: 'pendle', captures: 'lifi', lpSymbol: p.lpSymbol };
+    // se Pendle falhar, cai pro Enso (raro)
+  }
+  const z = await buildEnsoZap(pool, cfg, amountBase, receiver);
+  if ('error' in z) return z;
+  return { ...z, engine: 'enso', captures: 'enso', amountOut: z.amountOut, lpSymbol: z.lpSymbol };
+}
+
+/** LiFi `/quote` ativo→USDC (mesma rede ou cross) só pra saber o USDC ENTREGUE (a saída do contractCall não é confiável). */
+async function lifiDeliveredUsdc(fromChainId: number, toChainId: number, fromToken: string, toUsdc: string, fromAmount: string, fromAddress: string): Promise<bigint> {
+  const q = new URLSearchParams({ fromChain: String(fromChainId), toChain: String(toChainId), fromToken, toToken: toUsdc, fromAddress, fromAmount });
+  if (LIFI_INTEGRATOR) { q.set('integrator', LIFI_INTEGRATOR); q.set('fee', LIFI_FEE); }
+  const r = await fetch(`${LIFI}/quote?${q.toString()}`);
+  if (!r.ok) return 0n;
+  const d = (await r.json()) as { estimate?: { toAmount?: string } };
+  return BigInt(d.estimate?.toAmount ?? '0');
+}
+
+/** LiFi contractCalls: embrulha o calldata de destino captando NOSSA taxa (`Mazari-Fi`). Funciona same-chain e cross-chain. */
+async function lifiContractTx(fromChainId: number, toChainId: number, fromToken: string, toUsdc: string, fromAddress: string, destAmount: string, destTo: string, destData: string) {
+  const body = {
+    fromChain: String(fromChainId), fromToken, fromAddress,
+    toChain: String(toChainId), toToken: toUsdc, toAmount: destAmount,
+    ...(LIFI_INTEGRATOR ? { integrator: LIFI_INTEGRATOR, fee: LIFI_FEE } : {}),
+    contractCalls: [{ fromAmount: destAmount, fromTokenAddress: toUsdc, toContractAddress: destTo, toContractCallData: destData, toContractGasLimit: '950000' }],
+  };
+  const r = await fetch(`${LIFI}/quote/contractCalls`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) return null;
+  const cd = (await r.json()) as { transactionRequest?: { to?: string; data?: string; value?: string }; estimate?: { approvalAddress?: string; executionDuration?: number }; tool?: string };
+  const tx = cd.transactionRequest;
+  if (!tx?.to || !tx.data) return null;
+  return { to: tx.to, data: tx.data, value: tx.value ?? '0', spender: cd.estimate?.approvalAddress ?? tx.to, durationS: cd.estimate?.executionDuration ?? null, tool: cd.tool ?? null };
+}
+
 app.get('/api/zap/quote', async (req, res) => {
   try {
     if (process.env.ZAP_ENABLED !== 'true' || !process.env.ENSO_API_KEY) return res.json({ supported: false, reason: 'zap desativado' });
@@ -430,24 +487,35 @@ app.get('/api/zap/quote', async (req, res) => {
     if (!pool) return res.json({ supported: false, reason: 'pool não encontrada' });
     const cfg = chainOf(pool.chain);
     const amountIn = BigInt(Math.floor(amountUsdc * 1e6)).toString(); // USDC = 6 casas
+    const pr = pool as { project: string; raw: EnsoRaw };
 
-    const z = await buildEnsoZap(pool as { project: string; raw: EnsoRaw }, cfg, amountIn, fromAddress, slippageBps);
-    if ('error' in z) return res.json({ supported: false, reason: z.error });
+    // Engine ENSO (capta a taxa nativa) → tx direta, mais barata.
+    if (!pr.raw?.pendle?.market) {
+      const z = await buildEnsoZap(pr, cfg, amountIn, fromAddress, slippageBps);
+      if ('error' in z) return res.json({ supported: false, reason: z.error });
+      return res.json({ supported: true, engine: 'enso', lpTarget: z.lpTarget, lpSymbol: z.lpSymbol, tokenIn: cfg.usdc, amountIn, to: z.to, data: z.data, value: z.value, spender: z.spender, amountOut: z.amountOut, gas: z.gas, priceImpact: z.priceImpact ?? 0, feeBps: z.feeBps });
+    }
 
+    // Engine PENDLE → mesma rede, embrulhada na LiFi pra CAPTAR NOSSA TAXA (a tx do Pendle não captaria).
+    // (USDC→USDC no /quote não tem rota; vamos direto no contractCalls com folga p/ nossa fee + fixed fee da LiFi.)
+    const destAmount = ((BigInt(amountIn) * 98n) / 100n).toString();
+    const call = await buildPendleCall(cfg, pr.raw.pendle, destAmount, fromAddress);
+    if ('error' in call) return res.json({ supported: false, reason: call.error });
+    const tx = await lifiContractTx(cfg.chainId, cfg.chainId, cfg.usdc, cfg.usdc, fromAddress, destAmount, call.to, call.data);
+    if (!tx) return res.json({ supported: false, reason: 'falha ao captar a taxa (LiFi)' });
     res.json({
       supported: true,
-      lpTarget: z.lpTarget,
-      lpSymbol: z.lpSymbol,
+      engine: 'pendle',
+      lpSymbol: call.lpSymbol,
       tokenIn: cfg.usdc,
       amountIn,
-      to: z.to,
-      data: z.data,
-      value: z.value,
-      spender: z.spender, // approve do USDC vai pro router do Enso
-      amountOut: z.amountOut,
-      gas: z.gas,
-      priceImpact: z.priceImpact ?? 0,
-      feeBps: z.feeBps,
+      to: tx.to,
+      data: tx.data,
+      value: tx.value,
+      spender: tx.spender, // approve do USDC vai pro LiFi (que capta nossa taxa)
+      priceImpact: 0,
+      feeBps: LIFI_INTEGRATOR ? Number(LIFI_FEE) * 100 : 0,
+      expiry: pr.raw.pendle.expiry,
     });
   } catch (e) {
     console.error(e);
