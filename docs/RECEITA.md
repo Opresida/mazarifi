@@ -12,8 +12,8 @@
 |---|---|---|---|
 | 1 | Taxa de entrada **0,30%** (zap-in) | ✅ **Ativo** | Todo cliente, ao investir |
 | 2 | Rebate da ponte (**LiFi**, ~0,3%) | ✅ **Ativo** | Quem traz dinheiro de outra rede |
-| 3 | **Mazari Pro** (assinatura $5–$25/mês) | 🔜 Falta implementar | Cliente Pro (opcional) |
-| 4 | **Swap fee 0,2%** no auto-switch | 🔜 Falta implementar (depende do Autopilot) | Cliente Pro |
+| 3 | **Mazari Pro** (assinatura $5–$25/mês) | 🟡 Autopilot + gating preview prontos; falta cobrança | Cliente Pro (opcional) |
+| 4 | **Swap fee 0,2%** no auto-switch | ✅ **Ativo** (no Autopilot, 0,50% total) | Cliente Pro |
 | 5 | **Slippage 50/50** | 🔜 Falta implementar | Embutido na execução |
 | 6 | **Performance fee 8–10%** (Rota A) | ⏳ Futuro (auditoria + jurídico) | Sobre o lucro do cliente |
 
@@ -54,10 +54,10 @@
 - **Trava inteligente (rail dinâmico):** o código **nunca** cobra mais que **35% do lucro real** do cliente (calculado com o APY de verdade do vault). Se o lucro não justifica, o preço cai sozinho.
 - **Estado:** tiers e fórmula **FECHADOS**. **Falta:** sistema de cobrança + gating (liberar features por carteira Pro) + o rail dinâmico no código.
 
-### 4. Swap fee 0,2% no auto-switch
+### 4. Swap fee 0,2% no auto-switch ✅
 - **O que é:** quando o **Autopilot** troca o cliente de uma pool pra outra melhor, a Mazari capta 0,2% naquele swap.
 - **Condição:** só pra cliente **Pro** (faz parte do Autopilot).
-- **Estado:** **Falta** — depende do Autopilot/hook estar construído.
+- **Estado:** **ATIVO** — implementado no **Autopilot assistido** (`/api/autopilot/migrate`): a troca cobra `AUTOPILOT_FEE_BPS=50` = **0,30% entrada + 0,20% auto-switch**, captado na mesma tx (Enso `fee`/`feeReceiver=tesouro`). Não-custodial (o cliente assina a troca).
 
 ### 5. Slippage 50/50
 - **O que é:** quando a execução tem slippage favorável, a Mazari fica com **metade** dele; a outra metade volta pro cliente.

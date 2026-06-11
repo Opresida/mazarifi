@@ -117,6 +117,7 @@ async function fetchRetry(url: string, init: RequestInit = {}, tries = 4): Promi
 
 // Receita: taxa da Mazari (integrador Enso) — 0,30% na ENTRADA, saída 0% (spec §2.1). Sem MAZARI_TREASURY, sem taxa (graceful).
 const ZAP_FEE_BPS = process.env.ZAP_FEE_BPS || '30'; // 30 bps = 0,30%
+const AUTOPILOT_FEE_BPS = process.env.AUTOPILOT_FEE_BPS || '50'; // troca do Autopilot = 0,30 entrada + 0,20 auto-switch (só Pro)
 const MAZARI_TREASURY = process.env.MAZARI_TREASURY; // endereço que recebe a taxa
 
 // Ponte cross-chain (LiFi) — funciona sem key; o REBATE precisa do Partner Portal (LIFI_INTEGRATOR) — graceful.
@@ -298,43 +299,128 @@ app.get('/api/bridge/deposit-quote', async (req, res) => {
   }
 });
 
+type ApiPosition = { token: string; symbol: string | null; name: string | null; valueUsd: number; amount: string; decimals: number; protocol: string | null; logoUri: string | null; chain: string };
+
+/** Lê a carteira (Enso) e filtra as POSIÇÕES DeFi (LP/vault) com valor. Reusado por /positions e /autopilot. */
+async function loadPositions(address: string): Promise<ApiPosition[]> {
+  if (!process.env.ENSO_API_KEY) return [];
+  const perChain = await Promise.all(
+    CHAIN_LIST.map(async (cfg) => {
+      try {
+        const br = await fetch(`${ENSO}/wallet/balances?chainId=${cfg.chainId}&eoaAddress=${address}&useEoa=true`, { headers: ensoHeaders() });
+        if (!br.ok) return [];
+        const balances = (await br.json()) as Array<{ token: string; amount: string; decimals: number; price: number; symbol?: string; name?: string; logoUri?: string }>;
+        const candidates = balances
+          .map((b) => ({ ...b, valueUsd: (Number(b.amount) / 10 ** b.decimals) * (b.price || 0) }))
+          .filter((b) => b.valueUsd >= 1 && b.token.toLowerCase() !== cfg.usdc.toLowerCase())
+          .sort((a, b) => b.valueUsd - a.valueUsd)
+          .slice(0, 15);
+        return await Promise.all(
+          candidates.map(async (b) => {
+            try {
+              const mr = await fetch(`${ENSO}/tokens?chainId=${cfg.chainId}&address=${b.token}`, { headers: ensoHeaders() });
+              const mj = (await mr.json()) as { data?: Array<{ type?: string; protocolSlug?: string }> };
+              const meta = mj.data?.[0];
+              if (!meta || !(meta.type === 'defi' || meta.protocolSlug)) return null;
+              return { token: b.token, symbol: b.symbol ?? null, name: b.name ?? null, valueUsd: b.valueUsd, amount: b.amount, decimals: b.decimals, protocol: meta.protocolSlug ?? null, logoUri: b.logoUri ?? null, chain: cfg.name };
+            } catch {
+              return null;
+            }
+          }),
+        );
+      } catch {
+        return [];
+      }
+    }),
+  );
+  return perChain.flat().filter(Boolean) as ApiPosition[];
+}
+
 /** "Minhas posições": lê a carteira (Enso) e filtra as POSIÇÕES DeFi (LP/vault) com valor. */
 app.get('/api/positions', async (req, res) => {
   try {
-    if (!process.env.ENSO_API_KEY) return res.json({ positions: [] });
     const address = String(req.query.address ?? '');
     if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return res.status(400).json({ error: 'endereço inválido' });
-    // Posições em TODAS as chains suportadas (cada uma com o seu chainId).
-    const perChain = await Promise.all(
-      CHAIN_LIST.map(async (cfg) => {
-        try {
-          const br = await fetch(`${ENSO}/wallet/balances?chainId=${cfg.chainId}&eoaAddress=${address}&useEoa=true`, { headers: ensoHeaders() });
-          if (!br.ok) return [];
-          const balances = (await br.json()) as Array<{ token: string; amount: string; decimals: number; price: number; symbol?: string; name?: string; logoUri?: string }>;
-          const candidates = balances
-            .map((b) => ({ ...b, valueUsd: (Number(b.amount) / 10 ** b.decimals) * (b.price || 0) }))
-            .filter((b) => b.valueUsd >= 1 && b.token.toLowerCase() !== cfg.usdc.toLowerCase())
-            .sort((a, b) => b.valueUsd - a.valueUsd)
-            .slice(0, 15);
-          return await Promise.all(
-            candidates.map(async (b) => {
-              try {
-                const mr = await fetch(`${ENSO}/tokens?chainId=${cfg.chainId}&address=${b.token}`, { headers: ensoHeaders() });
-                const mj = (await mr.json()) as { data?: Array<{ type?: string; protocolSlug?: string }> };
-                const meta = mj.data?.[0];
-                if (!meta || !(meta.type === 'defi' || meta.protocolSlug)) return null;
-                return { token: b.token, symbol: b.symbol ?? null, name: b.name ?? null, valueUsd: b.valueUsd, amount: b.amount, decimals: b.decimals, protocol: meta.protocolSlug ?? null, logoUri: b.logoUri ?? null, chain: cfg.name };
-              } catch {
-                return null;
-              }
-            }),
-          );
-        } catch {
-          return [];
-        }
-      }),
-    );
-    res.json({ positions: perChain.flat().filter(Boolean) });
+    res.json({ positions: await loadPositions(address) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
+// ── AUTOPILOT (assistido, não-custodial): vigia as posições e sugere trocar pra uma pool melhor ──
+type PoolRow = { pool_key: string; chain: string; project: string; symbol: string | null; exposure: string | null; net_annual_15d: number | null; apy_base: number | null; raw: (EnsoRaw & { managed?: boolean }) | null };
+const baseSlug = (s: string | null | undefined) => String(s ?? '').toLowerCase().replace(/^.*?:/, '').split(/[-_]/)[0];
+const tokensOf = (s: string | null | undefined) => String(s ?? '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+const shareToken = (a: string | null | undefined, b: string | null | undefined) => { const ta = tokensOf(a); return tokensOf(b).some((x) => ta.includes(x)); };
+const annualOf = (p: PoolRow) => p.net_annual_15d ?? p.apy_base ?? null;
+const typeOf = (p: PoolRow) => (p.exposure === 'single' ? 'emprestimo' : p.raw?.managed ? 'gerenciada' : 'troca');
+
+/** Cérebro do Autopilot: pra cada posição, acha a melhor pool do MESMO tipo/chain com rendimento maior; só sugere se compensa. */
+app.get('/api/autopilot', async (req, res) => {
+  try {
+    const address = String(req.query.address ?? '');
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return res.status(400).json({ error: 'endereço inválido' });
+    const [positions, pools] = (await Promise.all([
+      loadPositions(address),
+      sql`SELECT pool_key, chain, project, symbol, exposure, net_annual_15d, apy_base, raw FROM pools
+          WHERE lower(project) ~ ${ZAPPABLE_RE} AND (exposure='single' OR raw->>'managed'='true')`,
+    ])) as [ApiPosition[], PoolRow[]];
+
+    const suggestions: unknown[] = [];
+    let monitored = 0;
+    for (const pos of positions) {
+      const sameChain = pools.filter((p) => p.chain === pos.chain);
+      // casa a posição com um pool nosso: por vaultAddress (gerenciada) OU protocolo+símbolo
+      const matched =
+        sameChain.find((p) => p.raw?.vaultAddress && String(p.raw.vaultAddress).toLowerCase() === pos.token.toLowerCase()) ??
+        sameChain.find((p) => baseSlug(p.project) === baseSlug(pos.protocol) && shareToken(p.symbol, pos.symbol)) ??
+        sameChain.find((p) => baseSlug(p.project) === baseSlug(pos.protocol));
+      if (!matched) { monitored++; continue; }
+      const annA = annualOf(matched) ?? 0;
+      const t = typeOf(matched);
+      const alts = sameChain
+        .filter((p) => p.pool_key !== matched.pool_key && typeOf(p) === t && annualOf(p) != null && annualOf(p)! > annA)
+        .sort((a, b) => (annualOf(b) ?? 0) - (annualOf(a) ?? 0));
+      const best = alts[0];
+      if (!best) { monitored++; continue; }
+      const annB = annualOf(best)!;
+      const delta = annB - annA;
+      const switchCostUsd = pos.valueUsd * 0.005 + 0.5; // taxa auto-switch 0,5% + folga de gás
+      const extraGainUsdYear = pos.valueUsd * (delta / 100);
+      if (delta < 1 || extraGainUsdYear <= switchCostUsd) { monitored++; continue; } // não vale o churn / não se paga em 1 ano
+      suggestions.push({
+        from: { token: pos.token, symbol: pos.symbol, protocol: pos.protocol, valueUsd: pos.valueUsd, amount: pos.amount, decimals: pos.decimals, chain: pos.chain, annualPct: annA },
+        to: { poolKey: best.pool_key, symbol: best.symbol, project: best.project, annualPct: annB },
+        deltaPct: delta,
+        extraGainUsdYear,
+        switchCostUsd,
+        paybackDays: Math.ceil(switchCostUsd / (extraGainUsdYear / 365)),
+      });
+    }
+    res.json({ suggestions, monitored, total: positions.length });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'erro interno' });
+  }
+});
+
+/** Troca 1-clique: rota Enso da posição atual (fromToken) direto pra pool melhor, com a taxa de auto-switch (0,50%). */
+app.get('/api/autopilot/migrate', async (req, res) => {
+  try {
+    if (process.env.ZAP_ENABLED !== 'true' || !process.env.ENSO_API_KEY) return res.json({ supported: false, reason: 'zap desativado' });
+    const fromToken = String(req.query.fromToken ?? '');
+    const fromAmount = String(req.query.fromAmount ?? '');
+    const toPoolKey = String(req.query.toPoolKey ?? '');
+    const fromAddress = String(req.query.fromAddress ?? '');
+    const slippageBps = Number(req.query.slippageBps) || 80; // 2 pernas (sai+entra) → folga maior
+    if (!/^0x[0-9a-fA-F]{40}$/.test(fromToken) || !fromAmount || !fromAddress || !toPoolKey) return res.status(400).json({ error: 'parâmetros faltando' });
+    const [pool] = (await sql`SELECT pool_key, chain, project, raw FROM pools WHERE pool_key = ${toPoolKey} LIMIT 1`) as PoolRow[];
+    if (!pool) return res.status(404).json({ error: 'pool destino não encontrada' });
+    const cfg = chainOf(pool.chain);
+    const z = await buildEnsoZap({ project: pool.project, raw: pool.raw }, cfg, fromAmount, fromAddress, slippageBps, { tokenIn: fromToken, feeBps: AUTOPILOT_FEE_BPS });
+    if ('error' in z) return res.json({ supported: false, reason: z.error });
+    res.json({ supported: true, ...z });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'erro interno' });
@@ -397,6 +483,7 @@ async function buildEnsoZap(
   amountBase: string,
   receiver: string,
   slippageBps = 50,
+  opts: { tokenIn?: string; feeBps?: string } = {}, // Autopilot: entra de OUTRO ativo (não USDC) e cobra a taxa de auto-switch
 ): Promise<EnsoZap | { error: string }> {
   let lp: { address: string; symbol?: string | null } | undefined;
   const managedVault = pool.raw?.vaultAddress;
@@ -418,19 +505,20 @@ async function buildEnsoZap(
   }
   if (!lp?.address) return { error: 'posição não encontrada no Enso' };
 
+  const feeStr = opts.feeBps ?? ZAP_FEE_BPS;
   const rq = new URLSearchParams({
     chainId: String(cfg.chainId),
     fromAddress: receiver,
     receiver,
     amountIn: amountBase,
-    tokenIn: cfg.usdc,
+    tokenIn: opts.tokenIn ?? cfg.usdc,
     tokenOut: lp.address,
     routingStrategy: 'router',
     slippage: String(slippageBps),
   });
-  const feeBps = MAZARI_TREASURY ? Number(ZAP_FEE_BPS) : 0;
+  const feeBps = MAZARI_TREASURY ? Number(feeStr) : 0;
   if (MAZARI_TREASURY) {
-    rq.set('fee', ZAP_FEE_BPS);
+    rq.set('fee', feeStr);
     rq.set('feeReceiver', MAZARI_TREASURY);
   }
   const rr = await fetchRetry(`${ENSO}/shortcuts/route?${rq.toString()}`, { headers: ensoHeaders() });
