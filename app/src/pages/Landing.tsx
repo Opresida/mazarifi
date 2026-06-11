@@ -12,6 +12,7 @@ import { Marquee } from '../components/landing/Marquee';
 import { BrutoLiquido } from '../components/landing/BrutoLiquido';
 import { Funnel } from '../components/landing/Funnel';
 import { Ecosystem } from '../components/landing/Ecosystem';
+import { AutopilotDemo } from '../components/landing/AutopilotDemo';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -241,20 +242,25 @@ export function Landing() {
       {/* S6.5 — Universo DeFi da Mazari (Nortoken + Wallet em breve) */}
       <Ecosystem />
 
-      {/* S7 — Autopilot (assistido, real) + autonomia total em breve */}
-      <section className="mx-auto max-w-4xl px-5 py-16">
+      {/* S7 — Autopilot (assistido, real) + demo da troca + autonomia total em breve */}
+      <section className="mx-auto max-w-5xl px-5 py-16">
         <Reveal>
-          <div className="relative overflow-hidden rounded-3xl border border-lime/25 bg-gradient-to-br from-lime/[0.06] to-transparent p-8 text-center sm:p-12">
-            <span className="font-mono inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[11px] font-bold uppercase text-lime">
-              <Bot size={12} /> Autopilot · Pro
-            </span>
-            <h2 className="font-display mt-4 text-2xl font-bold text-ftext sm:text-3xl">A gente acha a melhor pool. Você troca em 1 clique.</h2>
-            <p className="mx-auto mt-3 max-w-xl leading-relaxed text-muted">
-              O <b className="text-lime">Autopilot</b> vigia suas aplicações 24/7 e te avisa quando aparece uma pool que rende mais. Mas só sugere a troca quando <b className="text-ftext">compensa de verdade</b> — o ganho a mais cobre o custo de trocar e você sai ganhando. Nunca uma troca que te faça sair perdendo. Você só <b className="text-ftext">assina</b>; a Mazari nunca move seu dinheiro sozinha.
-            </p>
-            <p className="font-mono mx-auto mt-4 max-w-md text-[11px] leading-relaxed text-amber">
-              ⏳ Em breve: trocar 100% no automático.
-            </p>
+          <div className="relative overflow-hidden rounded-3xl border border-lime/25 bg-gradient-to-br from-lime/[0.06] to-transparent p-8 sm:p-10">
+            <div className="grid items-center gap-8 lg:grid-cols-2">
+              <div className="text-center lg:text-left">
+                <span className="font-mono inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[11px] font-bold uppercase text-lime">
+                  <Bot size={12} /> Autopilot · Pro
+                </span>
+                <h2 className="font-display mt-4 text-2xl font-bold text-ftext sm:text-3xl">A gente acha a melhor pool. Você troca em 1 clique.</h2>
+                <p className="mx-auto mt-3 max-w-xl leading-relaxed text-muted lg:mx-0">
+                  O <b className="text-lime">Autopilot</b> vigia suas aplicações 24/7 e te avisa quando aparece uma pool que rende mais. Mas só sugere a troca quando <b className="text-ftext">compensa de verdade</b> — o ganho a mais cobre o custo de trocar e você sai ganhando. Nunca uma troca que te faça sair perdendo. Você só <b className="text-ftext">assina</b>; a Mazari nunca move seu dinheiro sozinha.
+                </p>
+                <p className="font-mono mx-auto mt-4 max-w-md text-[11px] leading-relaxed text-amber lg:mx-0">
+                  ⏳ Em breve: trocar 100% no automático.
+                </p>
+              </div>
+              <AutopilotDemo />
+            </div>
           </div>
         </Reveal>
       </section>
