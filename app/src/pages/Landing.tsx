@@ -210,28 +210,31 @@ export function Landing() {
         </div>
       </section>
 
-      {/* S6 — Gerenciadas + Pendle */}
-      <section className="mx-auto max-w-6xl px-5 py-20">
-        <Reveal>
-          <h2 className="font-display max-w-2xl text-3xl font-bold leading-tight text-ftext sm:text-4xl">
-            Dois jeitos de render, do seu jeito.
-          </h2>
-        </Reveal>
-        <div className="mt-10 grid gap-5 lg:grid-cols-2">
+      {/* S6 — Gerenciadas + Pendle (seção CLARA — 2ª quebra de cor) */}
+      <section className="bg-bone text-ink">
+        <div className="mx-auto max-w-6xl px-5 py-20">
           <Reveal>
-            <div className="h-full rounded-3xl border border-lime/20 bg-gradient-to-b from-lime/5 to-transparent p-7">
-              <p className="font-mono text-xs uppercase tracking-wider text-lime">cofre gerenciado</p>
-              <h3 className="font-display mt-2 text-xl font-bold text-ftext">A gestão cuida do range sozinha.</h3>
-              <p className="mt-3 leading-relaxed text-muted">Você só acompanha. A posição se mantém otimizada sem você fazer nada — com o número real, medido por nós.</p>
-            </div>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-700">do seu jeito</p>
+            <h2 className="font-display mt-3 max-w-2xl text-3xl font-bold leading-tight sm:text-4xl">
+              Dois jeitos de render.
+            </h2>
           </Reveal>
-          <Reveal delay={0.08}>
-            <div className="h-full rounded-3xl border border-amber/20 bg-gradient-to-b from-amber/5 to-transparent p-7">
-              <p className="font-mono text-xs uppercase tracking-wider text-amber">renda fixa · pendle</p>
-              <h3 className="font-display mt-2 text-xl font-bold text-ftext">Você trava um rendimento até a data.</h3>
-              <p className="mt-3 leading-relaxed text-muted">Sabe exatamente o que vai receber até o vencimento. E mostramos a data na cara — quando ela chega, a gente te avisa.</p>
-            </div>
-          </Reveal>
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">
+            <Reveal>
+              <div className="h-full rounded-3xl border border-emerald-200 bg-white/70 p-7">
+                <p className="font-mono text-xs uppercase tracking-wider text-emerald-700">cofre gerenciado</p>
+                <h3 className="font-display mt-2 text-xl font-bold text-ink">A gestão cuida do range sozinha.</h3>
+                <p className="mt-3 leading-relaxed text-zinc-600">Você só acompanha. A posição se mantém otimizada sem você fazer nada — com o número real, medido por nós.</p>
+              </div>
+            </Reveal>
+            <Reveal delay={0.08}>
+              <div className="h-full rounded-3xl border border-amber-200 bg-white/70 p-7">
+                <p className="font-mono text-xs uppercase tracking-wider text-amber-700">renda fixa · pendle</p>
+                <h3 className="font-display mt-2 text-xl font-bold text-ink">Você trava um rendimento até a data.</h3>
+                <p className="mt-3 leading-relaxed text-zinc-600">Sabe exatamente o que vai receber até o vencimento. E mostramos a data na cara — quando ela chega, a gente te avisa.</p>
+              </div>
+            </Reveal>
+          </div>
         </div>
       </section>
 
