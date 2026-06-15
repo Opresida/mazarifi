@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { and, eq, lt } from 'drizzle-orm';
+import { and, eq, lt, sql } from 'drizzle-orm';
 import { getGasPriceWei, CHAIN_LIST } from '@mazarifi/chain';
 import { gasCostUsd, OP_GAS } from '@mazarifi/core';
 import { db } from './db/client.js';
@@ -65,10 +65,21 @@ async function main() {
     const { poolKey: _k, source: _s, provenance: _p, ...upd } = row;
     await db.insert(pools).values(row).onConflictDoUpdate({ target: pools.poolKey, set: upd });
   }
-  // Remove pools externas obsoletas (saíram do top-30 → não atualizadas nesta rodada).
-  // Só se a fonte externa veio OK (external > 0), pra não apagar tudo se o DefiLlama cair.
+  // Remove obsoletas (não atualizadas nesta rodada) — mas COM TRAVA DE SEGURANÇA por fonte:
+  // a limpeza de cada CATEGORIA só roda se a fonte dela veio OK nesta rodada. Assim, um soluço de
+  // UMA fonte (ex.: Beefy 403) NUNCA zera a categoria inteira — mantém o dado bom anterior.
+  const isManaged = sql`${pools.raw}->>'managed' = 'true'`;
   if (external.length > 0) {
-    await db.delete(pools).where(and(eq(pools.source, 'external'), lt(pools.updatedAt, runStart)));
+    // empréstimo/troca (DefiLlama) — só se o DefiLlama veio
+    await db.delete(pools).where(and(eq(pools.source, 'external'), sql`(${pools.raw}->>'managed') IS DISTINCT FROM 'true'`, lt(pools.updatedAt, runStart)));
+  } else {
+    console.warn('⚠️  DefiLlama veio vazio — NÃO limpei as pools de empréstimo/troca (mantive as anteriores).');
+  }
+  if (beefy.length > 0) {
+    // gerenciadas (Beefy) — só se a Beefy veio
+    await db.delete(pools).where(and(eq(pools.source, 'external'), isManaged, lt(pools.updatedAt, runStart)));
+  } else {
+    console.warn('⚠️  Beefy veio vazia — NÃO limpei as gerenciadas (mantive as anteriores).');
   }
   console.log(`✅ ${all.length} pools persistidas no Neon.\n`);
 

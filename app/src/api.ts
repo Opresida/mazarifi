@@ -1,50 +1,50 @@
 import type { Pool, Stats, AdminMetrics, BestPicks, NetworkMap, Position, PoolChartData } from './types';
 
-export async function fetchPools(): Promise<Pool[]> {
-  const r = await fetch('/api/pools');
-  if (!r.ok) throw new Error(`API /pools ${r.status}`);
-  return r.json();
+/** GET com retry (backoff 1,5s/3s) — resiliência a blip de rede / API acordando (cold start do Render). */
+async function fetchJson<T>(url: string, tries = 3): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url);
+      if (r.ok) return (await r.json()) as T;
+      lastErr = new Error(`${url} ${r.status}`);
+    } catch (e) {
+      lastErr = e;
+    }
+    if (i < tries - 1) await new Promise((res) => setTimeout(res, 1500 * (i + 1)));
+  }
+  throw lastErr ?? new Error(`falha em ${url}`);
 }
 
-export async function fetchStats(): Promise<Stats> {
-  const r = await fetch('/api/stats');
-  if (!r.ok) throw new Error(`API /stats ${r.status}`);
-  return r.json();
+export function fetchPools(): Promise<Pool[]> {
+  return fetchJson('/api/pools');
 }
 
-export async function fetchBest(): Promise<BestPicks> {
-  const r = await fetch('/api/best');
-  if (!r.ok) throw new Error(`API /best ${r.status}`);
-  return r.json();
+export function fetchStats(): Promise<Stats> {
+  return fetchJson('/api/stats');
 }
 
-export async function fetchPool(key: string): Promise<Pool | null> {
-  const r = await fetch(`/api/pool/${encodeURIComponent(key)}`);
-  if (!r.ok) throw new Error(`API /pool ${r.status}`);
-  return r.json();
+export function fetchBest(): Promise<BestPicks> {
+  return fetchJson('/api/best');
 }
 
-export async function fetchPoolChart(key: string): Promise<PoolChartData> {
-  const r = await fetch(`/api/pool/${encodeURIComponent(key)}/chart`);
-  if (!r.ok) throw new Error(`API /pool/chart ${r.status}`);
-  return r.json();
+export function fetchPool(key: string): Promise<Pool | null> {
+  return fetchJson(`/api/pool/${encodeURIComponent(key)}`);
+}
+
+export function fetchPoolChart(key: string): Promise<PoolChartData> {
+  return fetchJson(`/api/pool/${encodeURIComponent(key)}/chart`);
 }
 
 export async function fetchPositions(address: string): Promise<Position[]> {
-  const r = await fetch(`/api/positions?address=${address}`);
-  if (!r.ok) throw new Error(`API /positions ${r.status}`);
-  const j = await r.json();
+  const j = await fetchJson<{ positions?: Position[] }>(`/api/positions?address=${address}`);
   return j.positions ?? [];
 }
 
-export async function fetchNetwork(): Promise<NetworkMap | null> {
-  const r = await fetch('/api/network');
-  if (!r.ok) throw new Error(`API /network ${r.status}`);
-  return r.json();
+export function fetchNetwork(): Promise<NetworkMap | null> {
+  return fetchJson('/api/network');
 }
 
-export async function fetchAdminMetrics(): Promise<AdminMetrics> {
-  const r = await fetch('/api/admin/metrics');
-  if (!r.ok) throw new Error(`API /admin/metrics ${r.status}`);
-  return r.json();
+export function fetchAdminMetrics(): Promise<AdminMetrics> {
+  return fetchJson('/api/admin/metrics');
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Compass, Wallet, ArrowRight, Landmark, Repeat } from 'lucide-react';
 import type { Pool, BestPicks, NetworkMap } from '../types';
@@ -24,6 +24,7 @@ export function UserDashboard() {
   const [net, setNet] = useState<NetworkMap | null>(null);
   const [projKind, setProjKind] = useState<'lending' | 'trade'>('lending');
   const [loading, setLoading] = useState(true);
+  const [slow, setSlow] = useState(false); // cold start do Render demora ~50s
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [filters, setFilters] = useState<Set<string>>(new Set());
@@ -38,16 +39,28 @@ export function UserDashboard() {
       return next;
     });
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setSlow(false);
+    const slowTimer = setTimeout(() => setSlow(true), 6000); // se demorar, avisa que o servidor está acordando
     Promise.all([fetchPools(), fetchBest(), fetchNetwork().catch(() => null)])
       .then(([p, b, n]) => {
         setPools(p);
         setBest(b);
         setNet(n);
       })
-      .catch(() => setError('Não consegui carregar os dados agora (a fonte pode estar fora do ar). Tente recarregar.'))
-      .finally(() => setLoading(false));
+      .catch(() => setError('Não consegui carregar os dados agora (a fonte pode estar fora do ar).'))
+      .finally(() => {
+        clearTimeout(slowTimer);
+        setSlow(false);
+        setLoading(false);
+      });
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const list = useMemo(() => {
     const base = pools
@@ -80,7 +93,17 @@ export function UserDashboard() {
       </p>
 
       {error && (
-        <div className="mt-4 rounded-xl border border-rose/30 bg-rose/8 px-4 py-3 text-sm text-rose">{error}</div>
+        <div className="mt-4 flex flex-col items-start gap-2 rounded-xl border border-rose/30 bg-rose/8 px-4 py-3 text-sm text-rose sm:flex-row sm:items-center sm:justify-between">
+          <span>{error}</span>
+          <button onClick={load} className="shrink-0 rounded-lg border border-rose/40 px-3 py-1.5 text-xs font-semibold text-rose transition-colors hover:bg-rose/10">
+            Recarregar
+          </button>
+        </div>
+      )}
+      {!error && slow && loading && (
+        <div className="mt-4 rounded-xl border border-amber/30 bg-amber/8 px-4 py-3 text-sm text-amber">
+          Acordando o servidor… isso pode levar até 1 minuto na primeira vez. Já já carrega. ⏳
+        </div>
       )}
 
       {/* DOIS destaques: empréstimo (seguro) vs pool de troca (rende mais) */}
