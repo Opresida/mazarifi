@@ -33,6 +33,8 @@ async function fetchVaultReturn15d(poolId: string): Promise<{ ret: number; volLo
 const COW_VAULTS = 'https://api.beefy.finance/cow-vaults';
 const APY_URL = 'https://api.beefy.finance/apy';
 const DEFILLAMA_POOLS = 'https://yields.llama.fi/pools';
+// A Beefy bloqueia requests sem User-Agent de navegador (403) — em servidor (Render/CI) o fetch do node cai nisso.
+const BEEFY_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36' };
 const WINDOW_DAYS = 15;
 const MIN_TVL = 100_000; // TVL do VAULT no DefiLlama (adoção real, não o pool cru)
 const MAX_APY = 150;
@@ -76,8 +78,8 @@ const CL_PROJECTS = new Set(['aerodrome-slipstream', 'pancakeswap-amm-v3', 'unis
 /** Vaults Beefy-CLM da Base, curados, com a NOSSA matemática no rendimento real do vault (DefiLlama). */
 export async function fetchBeefyManagedPools(limit = 50): Promise<NormalizedPool[]> {
   const [cow, apy, llama] = await Promise.all([
-    fetch(COW_VAULTS).then((r) => r.json() as Promise<CowVault[]>),
-    fetch(APY_URL).then((r) => r.json() as Promise<Record<string, number>>),
+    fetch(COW_VAULTS, { headers: BEEFY_HEADERS }).then((r) => r.json() as Promise<CowVault[]>),
+    fetch(APY_URL, { headers: BEEFY_HEADERS }).then((r) => r.json() as Promise<Record<string, number>>),
     fetch(DEFILLAMA_POOLS).then((r) => r.json() as Promise<{ data: LlamaBeefy[] }>),
   ]);
 
